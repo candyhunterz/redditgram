@@ -127,13 +127,17 @@ export default function Home() {
     setFetchInitiated(true); // Mark that fetch has been initiated
     setCache({}); // Clear cache
 
-        const subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
-        let usedSubs = subs.length > 0 ? subs : favorites; // Use favorites if no subreddits entered
+        let subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
+        if (subs.length === 0) {
+          subs = favorites; // If no subreddits entered, use favorites
+        }
 
-    if (usedSubs.every(isValidSubreddit)) {
+    let tempSubs = subs;
+
+    if (tempSubs.every(isValidSubreddit)) {
       try {
         const initialPosts = await Promise.all(
-          usedSubs.map(async sub => {
+          tempSubs.map(async sub => {
             // Pass undefined if after is null
             const { posts, after: newAfter } = await getHotPosts(sub, after || undefined, POSTS_PER_LOAD);
             setCache(prevCache => ({ ...prevCache, [sub]: posts }));
@@ -157,8 +161,14 @@ export default function Home() {
         setPosts(filteredPosts);
 
         // Set 'after' value based on last subreddit's response
-        setAfter(initialPosts[initialPosts.length - 1].after);
-        setHasMore(initialPosts.some(result => result.after !== null));
+        if (initialPosts.length > 0) {
+          setAfter(initialPosts[initialPosts.length - 1].after);
+          setHasMore(initialPosts.some(result => result.after !== null));
+        } else {
+          setAfter(null);
+          setHasMore(false);
+        }
+
 
       } catch (e: any) {
         setError(`Failed to fetch posts: ${e.message}`);
@@ -173,13 +183,17 @@ export default function Home() {
     if (isLoading || !hasMore) return;
     setIsLoading(true);
 
-        const subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
-        let usedSubs = subs.length > 0 ? subs : favorites; // Use favorites if no subreddits entered
+        let subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
+        if (subs.length === 0) {
+          subs = favorites; // If no subreddits entered, use favorites
+        }
 
-    if (usedSubs.every(isValidSubreddit)) {
+    let tempSubs = subs;
+
+    if (tempSubs.every(isValidSubreddit)) {
       try {
         const newPosts = await Promise.all(
-          usedSubs.map(async sub => {
+          tempSubs.map(async sub => {
             const { posts, after: newAfter } = await getHotPosts(sub, after || undefined, POSTS_PER_LOAD);
             return { sub, posts, newAfter };
           })
@@ -201,8 +215,13 @@ export default function Home() {
         setPosts(prevPosts => [...prevPosts, ...filteredPosts]);
 
         // Update 'after' and 'hasMore' based on the responses
-        setAfter(newPosts[newPosts.length - 1].newAfter);
-        setHasMore(newPosts.some(result => result.newAfter !== null));
+         if (newPosts.length > 0) {
+            setAfter(newPosts[newPosts.length - 1].newAfter);
+            setHasMore(newPosts.some(result => result.newAfter !== null));
+          } else {
+            setAfter(null);
+            setHasMore(false);
+          }
 
       } catch (e: any) {
         setError(`Failed to fetch more posts: ${e.message}`);
@@ -268,11 +287,9 @@ export default function Home() {
       <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
         {posts.map((post, index) => (
           <div key={index} className="relative" ref={posts.length === index + 1 ? lastPostRef : null}>
-            <button onClick={() => handleThumbnailClick(post)} className="w-full h-full block">
-              <Card className="overflow-hidden cursor-pointer">
+            <Card onClick={() => handleThumbnailClick(post)} className="overflow-hidden cursor-pointer">
                  <MediaCarousel mediaUrls={post.mediaUrls} title={post.title} subreddit={post.subreddit} postId={post.postId}/>
               </Card>
-            </button>
           </div>
         ))}
       </div>
