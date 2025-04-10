@@ -117,7 +117,7 @@ const MediaCarousel: React.FC<MediaCarouselProps> = ({ mediaUrls, title, subredd
             controls
             muted
             playsInline
-            autoPlay
+            autoPlay={isFullScreen}
           />
         ) : (
           <img
@@ -156,8 +156,9 @@ export default function Home() {
   const [hasMore, setHasMore] = useState(true);
   const [fetchInitiated, setFetchInitiated] = useState(false); // Track if fetch has been initiated
   const [cache, setCache] = useState<{ [key: string]: RedditPost[] }>({}); // Add cache state
-  const [favorites, setFavorites] = useState<string[]>([]);
-  const [open, setOpen] = React.useState(false)
+    const [favorites, setFavorites] = useState<string[]>([]);
+    const [open, setOpen] = React.useState(false)
+
 
   const { toast } = useToast();
 
@@ -279,17 +280,18 @@ export default function Home() {
     setOpen(false);
   };
 
-  const toggleFavorite = (subredditName: string) => {
-    setFavorites(prevFavorites => {
-      if (prevFavorites.includes(subredditName)) {
-        return prevFavorites.filter(fav => fav !== subredditName);
-      } else {
-        return [...prevFavorites, subredditName];
-      }
-    });
-  };
+    const toggleFavorite = (subredditName: string) => {
+        setFavorites(prevFavorites => {
+            if (prevFavorites.includes(subredditName)) {
+                return prevFavorites.filter(fav => fav !== subredditName);
+            } else {
+                return [...prevFavorites, subredditName];
+            }
+        });
+    };
 
-  const isFavorite = (subredditName: string) => favorites.includes(subredditName);
+    const isFavorite = (subredditName: string) => favorites.includes(subredditName);
+
 
   return (
     <div className="container mx-auto p-4">
@@ -343,3 +345,4 @@ export default function Home() {
     </div>
   );
 }
+
