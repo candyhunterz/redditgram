@@ -163,7 +163,7 @@ export default function Home() {
             <button onClick={() => handleThumbnailClick(post)} className="w-full h-full block">
               <Card className="overflow-hidden cursor-pointer">
                 {post.mediaUrl.endsWith('.mp4') ? (
-                  <video src={post.mediaUrl} alt={post.title} className="w-full h-auto object-cover aspect-square" muted playsInline />
+                  <video src={post.mediaUrl} alt={post.title} className="w-full h-auto object-cover aspect-square" muted playsInline autoPlay />
                 ) : (
                   <img src={post.mediaUrl} alt={post.title} className="w-full h-auto object-cover aspect-square" />
                 )}
@@ -207,3 +207,4 @@ export default function Home() {
     </div>
   );
 }
+
