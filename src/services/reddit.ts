@@ -165,7 +165,7 @@ export async function getPosts(
                 return null; // Return null if no media was found for this child
             })
             // Filter out the null entries where no media was found or data was invalid
-            .filter((post): post is RedditPost => post !== null);
+            .filter((post: RedditPost | null): post is RedditPost => post !== null);
 
         return {
             posts: posts,
