@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RedditPost, getHotPosts } from "@/services/reddit";
 import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -23,9 +22,10 @@ interface MediaCarouselProps {
   title: string;
   subreddit: string;
   postId: string;
+  isFullScreen?: boolean;
 }
 
-const MediaCarousel: React.FC<MediaCarouselProps> = ({ mediaUrls, title, subreddit, postId }) => {
+const MediaCarousel: React.FC<MediaCarouselProps> = ({ mediaUrls, title, subreddit, postId, isFullScreen = false }) => {
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
 
   const nextMedia = () => {
@@ -67,7 +67,7 @@ const MediaCarousel: React.FC<MediaCarouselProps> = ({ mediaUrls, title, subredd
         <video
           src={mediaUrls[currentMediaIndex]}
           alt={title}
-          className="w-full h-auto object-contain aspect-square"
+          className={cn("w-full h-auto object-contain", isFullScreen ? 'max-w-full max-h-full' : 'aspect-square')}
           controls
           muted
           playsInline
@@ -77,7 +77,7 @@ const MediaCarousel: React.FC<MediaCarouselProps> = ({ mediaUrls, title, subredd
         <img
           src={mediaUrls[currentMediaIndex]}
           alt={title}
-          className="w-full h-auto object-contain aspect-square"
+          className={cn("w-full h-auto object-contain", isFullScreen ? 'max-w-full max-h-full' : 'aspect-square')}
         />
       )}
     </div>
@@ -95,6 +95,7 @@ export default function Home() {
   const [fetchInitiated, setFetchInitiated] = useState(false); // Track if fetch has been initiated
   const [cache, setCache] = useState<{ [key: string]: RedditPost[] }>({}); // Add cache state
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
   const { toast } = useToast();
 
@@ -127,7 +128,7 @@ export default function Home() {
 
     const subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
     if (subs.length === 0) {
-        setSubreddits(favorites.join(', ')); // If no subreddits entered, use favorites
+      setSubreddits(favorites.join(', ')); // If no subreddits entered, use favorites
     }
 
     if (subs.every(isValidSubreddit)) {
@@ -169,9 +170,9 @@ export default function Home() {
     setIsLoading(true);
 
     const subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
-      if (subs.length === 0) {
-          setSubreddits(favorites.join(', ')); // If no subreddits entered, use favorites
-      }
+    if (subs.length === 0) {
+      setSubreddits(favorites.join(', ')); // If no subreddits entered, use favorites
+    }
 
     if (subs.every(isValidSubreddit)) {
       try {
@@ -207,10 +208,12 @@ export default function Home() {
 
   const handleThumbnailClick = (post: RedditPost) => {
     setSelectedPost(post);
+    setIsFullScreen(true);
   };
 
   const handleDialogClose = () => {
     setSelectedPost(null);
+    setIsFullScreen(false);
   };
 
   const toggleFavorite = (subredditName: string) => {
@@ -258,22 +261,21 @@ export default function Home() {
       {!hasMore && <p>No more posts to load.</p>}
 
       {/* Expanded View Modal */}
-      <Dialog open={selectedPost !== null} onOpenChange={(open) => { if (!open) handleDialogClose(); }}>
-        <DialogContent className="max-w-lg">
-          {selectedPost && (
-            <>
-              <DialogTitle>{selectedPost.title} (From: {selectedPost.subreddit})</DialogTitle>
-              <DialogDescription>From: {selectedPost.subreddit}</DialogDescription>
-              <MediaCarousel mediaUrls={selectedPost.mediaUrls} title={selectedPost.title} subreddit={selectedPost.subreddit} postId={selectedPost.postId} />
+      {isFullScreen && selectedPost && (
+        <div className="fixed top-0 left-0 w-full h-full bg-black flex items-center justify-center z-50" onClick={handleDialogClose}>
+          <div className="relative" onClick={(e) => e.stopPropagation()}>
+            <MediaCarousel mediaUrls={selectedPost.mediaUrls} title={selectedPost.title} subreddit={selectedPost.subreddit} postId={selectedPost.postId} isFullScreen={true} />
+            <div className="flex justify-between mt-2">
               <Button asChild>
                 <a href={`https://www.reddit.com/r/${selectedPost.subreddit}/comments/${selectedPost.postId}`} target="_blank" rel="noopener noreferrer">
                   Source
                 </a>
               </Button>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+              <Button onClick={handleDialogClose}>Close</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="mt-8 text-center text-muted-foreground">
@@ -284,4 +286,3 @@ export default function Home() {
     </div>
   );
 }
-
