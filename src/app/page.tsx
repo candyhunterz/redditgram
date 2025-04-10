@@ -67,7 +67,7 @@ const MediaCarousel: React.FC<MediaCarouselProps> = ({ mediaUrls, title, subredd
         <video
           src={mediaUrls[currentMediaIndex]}
           alt={title}
-          className="w-full h-auto object-cover aspect-square"
+          className="w-full h-auto object-contain aspect-square"
           controls
           muted
           playsInline
@@ -77,7 +77,7 @@ const MediaCarousel: React.FC<MediaCarouselProps> = ({ mediaUrls, title, subredd
         <img
           src={mediaUrls[currentMediaIndex]}
           alt={title}
-          className="w-full h-auto object-cover aspect-square"
+          className="w-full h-auto object-contain aspect-square"
         />
       )}
     </div>
@@ -127,7 +127,7 @@ export default function Home() {
 
     const subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
     if (subs.length === 0) {
-        setSubreddits(favorites.join(', ')); // If no subreddits entered, use favorites from favorites
+        setSubreddits(favorites.join(', ')); // If no subreddits entered, use favorites
     }
 
     if (subs.every(isValidSubreddit)) {
@@ -170,7 +170,7 @@ export default function Home() {
 
     const subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
       if (subs.length === 0) {
-          setSubreddits(favorites.join(', ')); // If no subreddits entered, use favorites from favorites
+          setSubreddits(favorites.join(', ')); // If no subreddits entered, use favorites
       }
 
     if (subs.every(isValidSubreddit)) {
@@ -244,7 +244,7 @@ export default function Home() {
       </div>
 
       {/* Media Gallery */}
-      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
+      <div className="grid gap-0 md:grid-cols-3 lg:grid-cols-4">
         {posts.map((post, index) => (
           <div key={index} className="relative" ref={posts.length === index + 1 ? lastPostRef : null}>
             <Card onClick={() => handleThumbnailClick(post)} className="overflow-hidden cursor-pointer">
@@ -284,3 +284,4 @@ export default function Home() {
     </div>
   );
 }
+
