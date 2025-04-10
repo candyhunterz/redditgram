@@ -177,7 +177,7 @@ export default function Home() {
               <DialogTitle>{selectedPost.title}</DialogTitle>
               <DialogDescription>From: {selectedPost.subreddit}</DialogDescription>
               {selectedPost.mediaUrl.endsWith('.mp4') ? (
-                <video src={selectedPost.mediaUrl} alt={selectedPost.title} className="w-full h-auto" controls playsInline />
+                <video src={selectedPost.mediaUrl} alt={selectedPost.title} className="w-full h-auto" controls playsInline autoPlay />
               ) : (
                 <img src={selectedPost.mediaUrl} alt={selectedPost.title} className="w-full h-auto" />
               )}
