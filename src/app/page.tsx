@@ -24,25 +24,26 @@ export default function Home() {
   const [after, setAfter] = useState<string | null>(null); // Pagination token
   const [hasMore, setHasMore] = useState(true);
   const [fetchInitiated, setFetchInitiated] = useState(false); // Track if fetch has been initiated
+  const [cache, setCache] = useState<{ [key: string]: RedditPost[] }>({}); // Add cache state
 
   const observer = useRef<IntersectionObserver>();
   const lastPostRef = useCallback(
     (node: HTMLDivElement) => {
       if (isLoading) return;
       if (observer.current) observer.current.disconnect();
-  
+
       observer.current = new IntersectionObserver(entries => {
         if (entries[0].isIntersecting && hasMore && fetchInitiated) {
           // Only trigger if fetch has been initiated
           loadMorePosts();
         }
       });
-  
+
       if (node) observer.current.observe(node);
     },
     [isLoading, hasMore, fetchInitiated]
   );
-  
+
 
   const fetchPosts = async () => {
     setIsLoading(true);
@@ -51,6 +52,7 @@ export default function Home() {
     setAfter(null); // Reset pagination
     setHasMore(true);
     setFetchInitiated(true); // Mark that fetch has been initiated
+    setCache({}); // Clear cache
 
     const subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
 
@@ -58,8 +60,13 @@ export default function Home() {
       try {
         const initialPosts = await Promise.all(
           subs.map(async sub => {
-            const { posts, after } = await getHotPosts(sub, undefined, POSTS_PER_LOAD);
-            return { sub, posts, after };
+            if (cache[sub]) {
+              return { sub, posts: cache[sub], after: null };
+            } else {
+              const { posts, after } = await getHotPosts(sub, undefined, POSTS_PER_LOAD);
+              setCache(prevCache => ({ ...prevCache, [sub]: posts }));
+              return { sub, posts, after };
+            }
           })
         );
 
@@ -90,7 +97,7 @@ export default function Home() {
     setIsLoading(true);
 
     const subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
-  
+
     if (subs.every(isValidSubreddit)) {
       try {
         const newPosts = await Promise.all(
@@ -99,21 +106,21 @@ export default function Home() {
             return { sub, posts, newAfter };
           })
         );
-  
+
         const flattenedPosts = newPosts.reduce((acc, curr) => {
           return acc.concat(curr.posts.map(post => ({ ...post, subreddit: curr.sub })));
         }, []);
-  
+
         const mediaPosts = flattenedPosts.filter(post => {
           return post.mediaUrl.endsWith('.jpg') || post.mediaUrl.endsWith('.jpeg') || post.mediaUrl.endsWith('.png') || post.mediaUrl.endsWith('.mp4');
         });
-  
+
         setPosts(prevPosts => [...prevPosts, ...mediaPosts]);
-  
+
         // Update 'after' and 'hasMore' based on the responses
         setAfter(newPosts[newPosts.length - 1].newAfter);
         setHasMore(newPosts.some(result => result.newAfter !== null));
-  
+
       } catch (e: any) {
         setError(`Failed to fetch more posts: ${e.message}`);
         setHasMore(false);
@@ -121,7 +128,7 @@ export default function Home() {
     }
     setIsLoading(false);
   };
-  
+
 
   const handleThumbnailClick = (post: RedditPost) => {
     setSelectedPost(post);
@@ -174,7 +181,7 @@ export default function Home() {
         <DialogContent className="max-w-lg">
           {selectedPost && (
             <>
-              <DialogTitle>{selectedPost.title}</DialogTitle>
+              <DialogTitle>{selectedPost.title} (From: {selectedPost.subreddit})</DialogTitle>
               <DialogDescription>From: {selectedPost.subreddit}</DialogDescription>
               {selectedPost.mediaUrl.endsWith('.mp4') ? (
                 <video src={selectedPost.mediaUrl} alt={selectedPost.title} className="w-full h-auto" controls playsInline autoPlay />
