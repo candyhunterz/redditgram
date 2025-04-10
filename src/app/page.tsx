@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RedditPost, getHotPosts } from "@/services/reddit";
 import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -27,7 +27,6 @@ interface MediaCarouselProps {
 
 const MediaCarousel: React.FC<MediaCarouselProps> = ({ mediaUrls, title, subreddit, postId }) => {
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
-  const { toast } = useToast();
 
   const nextMedia = () => {
     setCurrentMediaIndex((prevIndex) => (prevIndex + 1) % mediaUrls.length);
@@ -150,14 +149,8 @@ export default function Home() {
         }, []);
 
         const filteredPosts = flattenedPosts.filter(post => {
-          if (mediaFilter === 'all') {
-            return true;
-          } else if (mediaFilter === 'images') {
-            return post.mediaUrls.some(url => /\.(jpg|jpeg|png)$/i.test(url));
-          } else if (mediaFilter === 'videos') {
-            return post.mediaUrls.some(url => url.endsWith('.mp4'));
-          }
-          return false;
+          // Always return true to display all media types
+          return true;
         });
 
         setPosts(filteredPosts);
@@ -206,14 +199,8 @@ export default function Home() {
         }, []);
 
         const filteredPosts = flattenedPosts.filter(post => {
-          if (mediaFilter === 'all') {
-            return true;
-          } else if (mediaFilter === 'images') {
-            return post.mediaUrls.some(url => /\.(jpg|jpeg|png)$/i.test(url));
-          } else if (mediaFilter === 'videos') {
-            return post.mediaUrls.some(url => url.endsWith('.mp4'));
-          }
-          return false;
+          // Always return true to display all media types
+          return true;
         });
 
         setPosts(prevPosts => [...prevPosts, ...filteredPosts]);
