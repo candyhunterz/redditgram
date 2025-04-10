@@ -27,6 +27,7 @@ interface MediaCarouselProps {
 
 const MediaCarousel: React.FC<MediaCarouselProps> = ({ mediaUrls, title, subreddit, postId, isFullScreen = false }) => {
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const nextMedia = () => {
     setCurrentMediaIndex((prevIndex) => (prevIndex + 1) % mediaUrls.length);
@@ -63,23 +64,25 @@ const MediaCarousel: React.FC<MediaCarouselProps> = ({ mediaUrls, title, subredd
         </>
       )}
 
-      {mediaUrls[currentMediaIndex].endsWith('.mp4') ? (
-        <video
-          src={mediaUrls[currentMediaIndex]}
-          alt={title}
-          className={cn("w-full h-auto object-contain", isFullScreen ? 'max-w-full max-h-full' : 'aspect-square')}
-          controls
-          muted
-          playsInline
-          autoPlay
-        />
-      ) : (
-        <img
-          src={mediaUrls[currentMediaIndex]}
-          alt={title}
-          className={cn("w-full h-auto object-contain", isFullScreen ? 'max-w-full max-h-full' : 'aspect-square')}
-        />
-      )}
+      <div ref={containerRef} className="relative">
+        {mediaUrls[currentMediaIndex].endsWith('.mp4') ? (
+          <video
+            src={mediaUrls[currentMediaIndex]}
+            alt={title}
+            className={cn("w-full h-auto object-contain", isFullScreen ? 'max-w-full max-h-full' : 'aspect-square')}
+            controls
+            muted
+            playsInline
+            autoPlay
+          />
+        ) : (
+          <img
+            src={mediaUrls[currentMediaIndex]}
+            alt={title}
+            className={cn("w-full h-auto object-contain", isFullScreen ? 'max-w-full max-h-full' : 'aspect-square')}
+          />
+        )}
+      </div>
     </div>
   );
 };
@@ -127,8 +130,9 @@ export default function Home() {
     setCache({}); // Clear cache
 
     const subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
+
     if (subs.length === 0) {
-      setSubreddits(favorites.join(', ')); // If no subreddits entered, use favorites
+      setSubreddits(favorites);
     }
 
     if (subs.every(isValidSubreddit)) {
@@ -170,9 +174,9 @@ export default function Home() {
     setIsLoading(true);
 
     const subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
-    if (subs.length === 0) {
-      setSubreddits(favorites.join(', ')); // If no subreddits entered, use favorites
-    }
+      if (subs.length === 0) {
+          setSubreddits(favorites);
+      }
 
     if (subs.every(isValidSubreddit)) {
       try {
@@ -226,7 +230,7 @@ export default function Home() {
     });
   };
 
-  const isFavorite = (subredditName: string) => favorites.includes(subredditName);
+    const isFavorite = (subredditName: string) => favorites.includes(subredditName);
 
   return (
     <div className="container mx-auto p-4">
