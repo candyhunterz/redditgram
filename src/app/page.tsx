@@ -95,8 +95,8 @@ export default function Home() {
       try {
         const newPosts = await Promise.all(
           subs.map(async sub => {
-            const { posts, after } = await getHotPosts(sub, after, POSTS_PER_LOAD);
-            return { sub, posts, after };
+            const { posts, after: newAfter } = await getHotPosts(sub, after, POSTS_PER_LOAD);
+            return { sub, posts, newAfter };
           })
         );
   
@@ -111,8 +111,8 @@ export default function Home() {
         setPosts(prevPosts => [...prevPosts, ...mediaPosts]);
   
         // Update 'after' and 'hasMore' based on the responses
-        setAfter(newPosts[newPosts.length - 1].after);
-        setHasMore(newPosts.some(result => result.after !== null));
+        setAfter(newPosts[newPosts.length - 1].newAfter);
+        setHasMore(newPosts.some(result => result.newAfter !== null));
   
       } catch (e: any) {
         setError(`Failed to fetch more posts: ${e.message}`);
