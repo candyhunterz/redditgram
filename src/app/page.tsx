@@ -95,7 +95,6 @@ export default function Home() {
   const [fetchInitiated, setFetchInitiated] = useState(false); // Track if fetch has been initiated
   const [cache, setCache] = useState<{ [key: string]: RedditPost[] }>({}); // Add cache state
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [mediaFilter, setMediaFilter] = useState<string>('all');
 
   const { toast } = useToast();
 
@@ -128,10 +127,7 @@ export default function Home() {
 
     const subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
     if (subs.length === 0) {
-      // If no subreddits entered, use favorites
-      if (favorites.length > 0) {
-        setSubreddits(favorites.join(', ')); // Update the subreddits state
-      }
+        setSubreddits(favorites.join(', ')); // If no subreddits entered, use favorites from favorites
     }
 
     if (subs.every(isValidSubreddit)) {
@@ -148,12 +144,7 @@ export default function Home() {
           return acc.concat(curr.posts.map(post => ({ ...post, subreddit: curr.sub })));
         }, []);
 
-        const filteredPosts = flattenedPosts.filter(post => {
-          // Always return true to display all media types
-          return true;
-        });
-
-        setPosts(filteredPosts);
+        setPosts(flattenedPosts);
 
         // Set 'after' value based on last subreddit's response
         if (initialPosts.length > 0) {
@@ -178,12 +169,9 @@ export default function Home() {
     setIsLoading(true);
 
     const subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
-    if (subs.length === 0) {
-      // If no subreddits entered, use favorites
-      if (favorites.length > 0) {
-        setSubreddits(favorites.join(', ')); // Update the subreddits state
+      if (subs.length === 0) {
+          setSubreddits(favorites.join(', ')); // If no subreddits entered, use favorites from favorites
       }
-    }
 
     if (subs.every(isValidSubreddit)) {
       try {
@@ -198,12 +186,7 @@ export default function Home() {
           return acc.concat(curr.posts.map(post => ({ ...post, subreddit: curr.sub })));
         }, []);
 
-        const filteredPosts = flattenedPosts.filter(post => {
-          // Always return true to display all media types
-          return true;
-        });
-
-        setPosts(prevPosts => [...prevPosts, ...filteredPosts]);
+        setPosts(prevPosts => [...prevPosts, ...flattenedPosts]);
 
         // Update 'after' and 'hasMore' based on the responses
         if (newPosts.length > 0) {
@@ -258,19 +241,6 @@ export default function Home() {
           {isLoading ? "Fetching..." : "Fetch Posts"}
         </Button>
         {error && <p className="text-red-500 mt-2">{error}</p>}
-      </div>
-
-      {/* Filtering */}
-      <div className="flex space-x-4 mb-4">
-        <select
-          value={mediaFilter}
-          onChange={(e) => setMediaFilter(e.target.value)}
-          className="border rounded px-2 py-1"
-        >
-          <option value="all">All Media</option>
-          <option value="images">Images Only</option>
-          <option value="videos">Videos Only</option>
-        </select>
       </div>
 
       {/* Media Gallery */}
