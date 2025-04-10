@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RedditPost, getHotPosts } from "@/services/reddit";
@@ -95,7 +95,7 @@ export default function Home() {
   const [hasMore, setHasMore] = useState(true);
   const [fetchInitiated, setFetchInitiated] = useState(false); // Track if fetch has been initiated
   const [cache, setCache] = useState<{ [key: string]: RedditPost[] }>({}); // Add cache state
-  const [favorites, setFavorites] = useState<string[]>([]);
+    const [favorites, setFavorites] = useState<string[]>([]);
   const [mediaFilter, setMediaFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('hot');
 
@@ -127,22 +127,17 @@ export default function Home() {
     setFetchInitiated(true); // Mark that fetch has been initiated
     setCache({}); // Clear cache
 
-    let subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
-        if (subs.length === 0) {
-            subs = favorites; // If no subreddits entered, use favorites
-        }
+        const subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
+        let usedSubs = subs.length > 0 ? subs : favorites; // Use favorites if no subreddits entered
 
-    if (subs.every(isValidSubreddit)) {
+    if (usedSubs.every(isValidSubreddit)) {
       try {
         const initialPosts = await Promise.all(
-          subs.map(async sub => {
-            if (cache[sub]) {
-              return { sub, posts: cache[sub], after: null };
-            } else {
-              const { posts, after } = await getHotPosts(sub, after, POSTS_PER_LOAD);
-              setCache(prevCache => ({ ...prevCache, [sub]: posts }));
-              return { sub, posts, after };
-            }
+          usedSubs.map(async sub => {
+            // Pass undefined if after is null
+            const { posts, after: newAfter } = await getHotPosts(sub, after || undefined, POSTS_PER_LOAD);
+            setCache(prevCache => ({ ...prevCache, [sub]: posts }));
+            return { sub, posts, after: newAfter };
           })
         );
 
@@ -150,7 +145,7 @@ export default function Home() {
           return acc.concat(curr.posts.map(post => ({ ...post, subreddit: curr.sub })));
         }, []);
 
-        const filteredPosts = flattenedPosts.filter(post => {
+                const filteredPosts = flattenedPosts.filter(post => {
                     if (mediaFilter === 'images') {
                         return post.mediaUrls.some(url => url.endsWith('.jpg') || url.endsWith('.jpeg') || url.endsWith('.png'));
                     } else if (mediaFilter === 'videos') {
@@ -158,6 +153,7 @@ export default function Home() {
                     }
                     return true; // 'all' or invalid filter
                 });
+
         setPosts(filteredPosts);
 
         // Set 'after' value based on last subreddit's response
@@ -177,16 +173,14 @@ export default function Home() {
     if (isLoading || !hasMore) return;
     setIsLoading(true);
 
-    let subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
-        if (subs.length === 0) {
-            subs = favorites; // If no subreddits entered, use favorites
-        }
+        const subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
+        let usedSubs = subs.length > 0 ? subs : favorites; // Use favorites if no subreddits entered
 
-    if (subs.every(isValidSubreddit)) {
+    if (usedSubs.every(isValidSubreddit)) {
       try {
         const newPosts = await Promise.all(
-          subs.map(async sub => {
-            const { posts, after: newAfter } = await getHotPosts(sub, after, POSTS_PER_LOAD);
+          usedSubs.map(async sub => {
+            const { posts, after: newAfter } = await getHotPosts(sub, after || undefined, POSTS_PER_LOAD);
             return { sub, posts, newAfter };
           })
         );
@@ -195,7 +189,7 @@ export default function Home() {
           return acc.concat(curr.posts.map(post => ({ ...post, subreddit: curr.sub })));
         }, []);
 
-        const filteredPosts = flattenedPosts.filter(post => {
+                const filteredPosts = flattenedPosts.filter(post => {
                     if (mediaFilter === 'images') {
                         return post.mediaUrls.some(url => url.endsWith('.jpg') || url.endsWith('.jpeg') || url.endsWith('.png'));
                     } else if (mediaFilter === 'videos') {
