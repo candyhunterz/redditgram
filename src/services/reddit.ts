@@ -1,4 +1,3 @@
-
 /**
  * Represents a Reddit post containing media.
  */
@@ -21,11 +20,18 @@ export interface RedditPost {
  * Asynchronously retrieves hot posts containing media from a given subreddit.
  *
  * @param subreddit The name of the subreddit to fetch posts from.
- * @returns A promise that resolves to an array of RedditPost objects.
+ * @param after The 'after' parameter for pagination.
+ * @param limit The number of posts to retrieve.
+ * @returns A promise that resolves to an object containing an array of RedditPost objects and the next 'after' token.
  */
-export async function getHotPosts(subreddit: string): Promise<RedditPost[]> {
+export async function getHotPosts(subreddit: string, after: string | undefined, limit: number = 20): Promise<{ posts: RedditPost[], after: string | null }> {
   try {
-    const response = await fetch(`https://www.reddit.com/r/${subreddit}/hot.json?limit=20`);
+    let url = `https://www.reddit.com/r/${subreddit}/hot.json?limit=${limit}`;
+    if (after) {
+      url += `&after=${after}`;
+    }
+
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -50,7 +56,10 @@ export async function getHotPosts(subreddit: string): Promise<RedditPost[]> {
       };
     }).filter((post: RedditPost) => post.mediaUrl !== ''); // Filter out posts without media
 
-    return posts;
+    return {
+      posts: posts,
+      after: data.data.after,
+    };
   } catch (error: any) {
     console.error("Error fetching posts:", error);
     throw new Error(`Failed to fetch posts from /r/${subreddit}: ${error.message}`);

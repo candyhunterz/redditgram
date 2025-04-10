@@ -1,7 +1,6 @@
-
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RedditPost, getHotPosts } from "@/services/reddit";
@@ -14,35 +13,69 @@ const isValidSubreddit = (subreddit: string): boolean => {
   return /^[a-zA-Z0-9_]+$/.test(subreddit);
 };
 
+const POSTS_PER_LOAD = 20; // Number of posts to load each time
+
 export default function Home() {
   const [subreddits, setSubreddits] = useState<string>('');
   const [posts, setPosts] = useState<RedditPost[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [selectedPost, setSelectedPost] = useState<RedditPost | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [after, setAfter] = useState<string | null>(null); // Pagination token
+  const [hasMore, setHasMore] = useState(true);
+  const [fetchInitiated, setFetchInitiated] = useState(false); // Track if fetch has been initiated
+
+  const observer = useRef<IntersectionObserver>();
+  const lastPostRef = useCallback(
+    (node: HTMLDivElement) => {
+      if (isLoading) return;
+      if (observer.current) observer.current.disconnect();
+  
+      observer.current = new IntersectionObserver(entries => {
+        if (entries[0].isIntersecting && hasMore && fetchInitiated) {
+          // Only trigger if fetch has been initiated
+          loadMorePosts();
+        }
+      });
+  
+      if (node) observer.current.observe(node);
+    },
+    [isLoading, hasMore, fetchInitiated]
+  );
+  
 
   const fetchPosts = async () => {
     setIsLoading(true);
     setError(null);
     setPosts([]);
+    setAfter(null); // Reset pagination
+    setHasMore(true);
+    setFetchInitiated(true); // Mark that fetch has been initiated
 
     const subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
 
     if (subs.every(isValidSubreddit)) {
       try {
-        const allPosts = await Promise.all(
+        const initialPosts = await Promise.all(
           subs.map(async sub => {
-            return await getHotPosts(sub);
+            const { posts, after } = await getHotPosts(sub, undefined, POSTS_PER_LOAD);
+            return { sub, posts, after };
           })
         );
-        // Flatten the array of arrays into a single array
-        const flattenedPosts = allPosts.reduce((acc, curr) => acc.concat(curr), []);
 
-        // Basic media filtering, adapt as necessary
+        const flattenedPosts = initialPosts.reduce((acc, curr) => {
+          return acc.concat(curr.posts.map(post => ({ ...post, subreddit: curr.sub })));
+        }, []);
+
         const mediaPosts = flattenedPosts.filter(post => {
-            return post.mediaUrl.endsWith('.jpg') || post.mediaUrl.endsWith('.jpeg') || post.mediaUrl.endsWith('.png') || post.mediaUrl.endsWith('.mp4');
+          return post.mediaUrl.endsWith('.jpg') || post.mediaUrl.endsWith('.jpeg') || post.mediaUrl.endsWith('.png') || post.mediaUrl.endsWith('.mp4');
         });
         setPosts(mediaPosts);
+
+        // Set 'after' value based on last subreddit's response
+        setAfter(initialPosts[initialPosts.length - 1].after);
+        setHasMore(initialPosts.some(result => result.after !== null));
+
       } catch (e: any) {
         setError(`Failed to fetch posts: ${e.message}`);
       }
@@ -52,6 +85,44 @@ export default function Home() {
     setIsLoading(false);
   };
 
+  const loadMorePosts = async () => {
+    if (isLoading || !hasMore) return;
+    setIsLoading(true);
+
+    const subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
+  
+    if (subs.every(isValidSubreddit)) {
+      try {
+        const newPosts = await Promise.all(
+          subs.map(async sub => {
+            const { posts, after } = await getHotPosts(sub, after, POSTS_PER_LOAD);
+            return { sub, posts, after };
+          })
+        );
+  
+        const flattenedPosts = newPosts.reduce((acc, curr) => {
+          return acc.concat(curr.posts.map(post => ({ ...post, subreddit: curr.sub })));
+        }, []);
+  
+        const mediaPosts = flattenedPosts.filter(post => {
+          return post.mediaUrl.endsWith('.jpg') || post.mediaUrl.endsWith('.jpeg') || post.mediaUrl.endsWith('.png') || post.mediaUrl.endsWith('.mp4');
+        });
+  
+        setPosts(prevPosts => [...prevPosts, ...mediaPosts]);
+  
+        // Update 'after' and 'hasMore' based on the responses
+        setAfter(newPosts[newPosts.length - 1].after);
+        setHasMore(newPosts.some(result => result.after !== null));
+  
+      } catch (e: any) {
+        setError(`Failed to fetch more posts: ${e.message}`);
+        setHasMore(false);
+      }
+    }
+    setIsLoading(false);
+  };
+  
+
   const handleThumbnailClick = (post: RedditPost) => {
     setSelectedPost(post);
   };
@@ -59,7 +130,6 @@ export default function Home() {
   const handleDialogClose = () => {
     setSelectedPost(null);
   };
-
 
   return (
     <div className="container mx-auto p-4">
@@ -82,19 +152,22 @@ export default function Home() {
       {/* Media Gallery */}
       <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
         {posts.map((post, index) => (
-            <div key={index} className="relative">
-              <button onClick={() => handleThumbnailClick(post)} className="w-full h-full block">
-                <Card className="overflow-hidden cursor-pointer">
-                  {post.mediaUrl.endsWith('.mp4') ? (
-                      <video src={post.mediaUrl} alt={post.title} className="w-full h-auto object-cover aspect-square" muted playsInline />
-                  ) : (
-                      <img src={post.mediaUrl} alt={post.title} className="w-full h-auto object-cover aspect-square" />
-                  )}
-                </Card>
-              </button>
-            </div>
+          <div key={index} className="relative" ref={posts.length === index + 1 ? lastPostRef : null}>
+            <button onClick={() => handleThumbnailClick(post)} className="w-full h-full block">
+              <Card className="overflow-hidden cursor-pointer">
+                {post.mediaUrl.endsWith('.mp4') ? (
+                  <video src={post.mediaUrl} alt={post.title} className="w-full h-auto object-cover aspect-square" muted playsInline />
+                ) : (
+                  <img src={post.mediaUrl} alt={post.title} className="w-full h-auto object-cover aspect-square" />
+                )}
+              </Card>
+            </button>
+          </div>
         ))}
       </div>
+
+      {isLoading && <div>Loading more posts...</div>}
+      {!hasMore && <p>No more posts to load.</p>}
 
       {/* Expanded View Modal */}
       <Dialog open={selectedPost !== null} onOpenChange={(open) => { if (!open) handleDialogClose(); }}>
@@ -112,7 +185,7 @@ export default function Home() {
           )}
         </DialogContent>
       </Dialog>
-      
+
       {/* Footer */}
       <footer className="mt-8 text-center text-muted-foreground">
         <p>
