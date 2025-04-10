@@ -34,6 +34,8 @@ interface MediaCarouselProps {
 const MediaCarousel: React.FC<MediaCarouselProps> = ({ mediaUrls, title, subreddit, postId, isFullScreen = false }) => {
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const [overlayPosition, setOverlayPosition] = useState<'top' | 'bottom'>('top');
 
   const nextMedia = () => {
     setCurrentMediaIndex((prevIndex) => (prevIndex + 1) % mediaUrls.length);
@@ -43,8 +45,41 @@ const MediaCarousel: React.FC<MediaCarouselProps> = ({ mediaUrls, title, subredd
     setCurrentMediaIndex((prevIndex) => (prevIndex - 1 + mediaUrls.length) % mediaUrls.length);
   };
 
+  const currentMediaUrl = mediaUrls[currentMediaIndex];
+
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+  };
+
+  // Determine overlay position based on aspect ratio
+  const updateOverlayPosition = useCallback(() => {
+    if (containerRef.current) {
+      const img = new Image();
+      img.src = currentMediaUrl;
+      img.onload = () => {
+        const aspectRatio = img.width / img.height;
+        setOverlayPosition(aspectRatio < 1 ? 'bottom' : 'top');
+      };
+    }
+  }, [currentMediaUrl]);
+
+  React.useEffect(() => {
+    if (isFullScreen) {
+      updateOverlayPosition();
+    }
+  }, [isFullScreen, currentMediaUrl, updateOverlayPosition]);
+
+
   return (
-    <div className="relative">
+    <div className="relative"
+      onMouseEnter={isFullScreen ? handleMouseEnter : undefined}
+      onMouseLeave={isFullScreen ? handleMouseLeave : undefined}
+      ref={containerRef}
+    >
       {mediaUrls.length > 1 && (
         <>
           <button
@@ -70,7 +105,7 @@ const MediaCarousel: React.FC<MediaCarouselProps> = ({ mediaUrls, title, subredd
         </>
       )}
 
-      <div ref={containerRef} className="relative">
+      <div className="relative">
         {mediaUrls[currentMediaIndex].endsWith('.mp4') ? (
           <video
             src={mediaUrls[currentMediaIndex]}
@@ -93,6 +128,18 @@ const MediaCarousel: React.FC<MediaCarouselProps> = ({ mediaUrls, title, subredd
               isFullScreen ? 'max-h-[90vh] max-w-full' : 'aspect-square'
             )}
           />
+        )}
+
+        {isFullScreen && (
+          <div
+            className={cn(
+              "absolute left-0 w-full bg-black/50 text-white transition-opacity duration-300 p-4",
+              overlayPosition === 'top' ? 'top-0' : 'bottom-0',
+              isHovered ? 'opacity-100' : 'opacity-0'
+            )}
+          >
+            <DialogTitle className="text-lg font-semibold">{title} (From: <a href={`https://www.reddit.com/r/${subreddit}/comments/${postId}`} target="_blank" rel="noopener noreferrer" className="underline">r/{subreddit}</a>)</DialogTitle>
+          </div>
         )}
       </div>
     </div>
@@ -281,17 +328,7 @@ export default function Home() {
         <DialogContent className="sm:max-w-[1024px]">
           {selectedPost && (
             <>
-              <DialogTitle>{selectedPost.title} (From: {selectedPost.subreddit})</DialogTitle>
-              <DialogDescription>From: {selectedPost.subreddit}</DialogDescription>
               <MediaCarousel mediaUrls={selectedPost.mediaUrls} title={selectedPost.title} subreddit={selectedPost.subreddit} postId={selectedPost.postId} isFullScreen={true} />
-              <div className="flex justify-between mt-2">
-                <Button asChild>
-                  <a href={`https://www.reddit.com/r/${selectedPost.subreddit}/comments/${selectedPost.postId}`} target="_blank" rel="noopener noreferrer">
-                    Source
-                  </a>
-                </Button>
-                <Button onClick={handleDialogClose}>Close</Button>
-              </div>
             </>
           )}
         </DialogContent>
