@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RedditPost, getHotPosts } from "@/services/reddit";
 import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -95,9 +95,10 @@ export default function Home() {
   const [hasMore, setHasMore] = useState(true);
   const [fetchInitiated, setFetchInitiated] = useState(false); // Track if fetch has been initiated
   const [cache, setCache] = useState<{ [key: string]: RedditPost[] }>({}); // Add cache state
-    const [favorites, setFavorites] = useState<string[]>([]);
+  const [favorites, setFavorites] = useState<string[]>([]);
   const [mediaFilter, setMediaFilter] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<string>('hot');
+
+  const { toast } = useToast();
 
   const observer = useRef<IntersectionObserver>();
   const lastPostRef = useCallback(
@@ -117,7 +118,6 @@ export default function Home() {
     [isLoading, hasMore, fetchInitiated]
   );
 
-
   const fetchPosts = async () => {
     setIsLoading(true);
     setError(null);
@@ -127,21 +127,19 @@ export default function Home() {
     setFetchInitiated(true); // Mark that fetch has been initiated
     setCache({}); // Clear cache
 
-        let subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
-        if (subs.length === 0) {
-          subs = favorites; // If no subreddits entered, use favorites
-        }
+    const subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
+    if (subs.length === 0) {
+      // If no subreddits entered, use favorites
+      if (favorites.length > 0) {
+        setSubreddits(favorites.join(', ')); // Update the subreddits state
+      }
+    }
 
-    let tempSubs = subs;
-    let afterValue: string | undefined = after || undefined;
-
-
-    if (tempSubs.every(isValidSubreddit)) {
+    if (subs.every(isValidSubreddit)) {
       try {
         const initialPosts = await Promise.all(
-          tempSubs.map(async sub => {
-            // Pass undefined if after is null
-            const { posts: fetchedPosts, after: newAfter } = await getHotPosts(sub, afterValue, POSTS_PER_LOAD);
+          subs.map(async sub => {
+            const { posts: fetchedPosts, after: newAfter } = await getHotPosts(sub, undefined, POSTS_PER_LOAD);
             setCache(prevCache => ({ ...prevCache, [sub]: fetchedPosts }));
             return { sub, posts: fetchedPosts, after: newAfter };
           })
@@ -152,16 +150,14 @@ export default function Home() {
         }, []);
 
         const filteredPosts = flattenedPosts.filter(post => {
-            if (mediaFilter === 'all') {
-                return true;
-            }
-            if (mediaFilter === 'images') {
-                return post.mediaUrls.some(url => /\.(jpg|jpeg|png)$/i.test(url));
-            }
-            if (mediaFilter === 'videos') {
-                return post.mediaUrls.some(url => url.endsWith('.mp4'));
-            }
+          if (mediaFilter === 'all') {
             return true;
+          } else if (mediaFilter === 'images') {
+            return post.mediaUrls.some(url => /\.(jpg|jpeg|png)$/i.test(url));
+          } else if (mediaFilter === 'videos') {
+            return post.mediaUrls.some(url => url.endsWith('.mp4'));
+          }
+          return false;
         });
 
         setPosts(filteredPosts);
@@ -174,7 +170,6 @@ export default function Home() {
           setAfter(null);
           setHasMore(false);
         }
-
 
       } catch (e: any) {
         setError(`Failed to fetch posts: ${e.message}`);
@@ -189,19 +184,19 @@ export default function Home() {
     if (isLoading || !hasMore) return;
     setIsLoading(true);
 
-        let subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
-        if (subs.length === 0) {
-          subs = favorites; // If no subreddits entered, use favorites
-        }
+    const subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
+    if (subs.length === 0) {
+      // If no subreddits entered, use favorites
+      if (favorites.length > 0) {
+        setSubreddits(favorites.join(', ')); // Update the subreddits state
+      }
+    }
 
-    let tempSubs = subs;
-    let afterValue: string | undefined = after || undefined;
-
-    if (tempSubs.every(isValidSubreddit)) {
+    if (subs.every(isValidSubreddit)) {
       try {
         const newPosts = await Promise.all(
-          tempSubs.map(async sub => {
-            const { posts: fetchedPosts, after: newAfter } = await getHotPosts(sub, afterValue, POSTS_PER_LOAD);
+          subs.map(async sub => {
+            const { posts: fetchedPosts, after: newAfter } = await getHotPosts(sub, after, POSTS_PER_LOAD);
             return { sub, posts: fetchedPosts, newAfter };
           })
         );
@@ -211,28 +206,26 @@ export default function Home() {
         }, []);
 
         const filteredPosts = flattenedPosts.filter(post => {
-            if (mediaFilter === 'all') {
-                return true;
-            }
-            if (mediaFilter === 'images') {
-                return post.mediaUrls.some(url => /\.(jpg|jpeg|png)$/i.test(url));
-            }
-            if (mediaFilter === 'videos') {
-                return post.mediaUrls.some(url => url.endsWith('.mp4'));
-            }
+          if (mediaFilter === 'all') {
             return true;
+          } else if (mediaFilter === 'images') {
+            return post.mediaUrls.some(url => /\.(jpg|jpeg|png)$/i.test(url));
+          } else if (mediaFilter === 'videos') {
+            return post.mediaUrls.some(url => url.endsWith('.mp4'));
+          }
+          return false;
         });
 
         setPosts(prevPosts => [...prevPosts, ...filteredPosts]);
 
         // Update 'after' and 'hasMore' based on the responses
-         if (newPosts.length > 0) {
-            setAfter(newPosts[newPosts.length - 1].newAfter);
-            setHasMore(newPosts.some(result => result.newAfter !== null));
-          } else {
-            setAfter(null);
-            setHasMore(false);
-          }
+        if (newPosts.length > 0) {
+          setAfter(newPosts[newPosts.length - 1].newAfter);
+          setHasMore(newPosts.some(result => result.newAfter !== null));
+        } else {
+          setAfter(null);
+          setHasMore(false);
+        }
 
       } catch (e: any) {
         setError(`Failed to fetch more posts: ${e.message}`);
@@ -242,7 +235,6 @@ export default function Home() {
     setIsLoading(false);
   };
 
-
   const handleThumbnailClick = (post: RedditPost) => {
     setSelectedPost(post);
   };
@@ -251,17 +243,17 @@ export default function Home() {
     setSelectedPost(null);
   };
 
-    const toggleFavorite = (subredditName: string) => {
-        setFavorites(prevFavorites => {
-            if (prevFavorites.includes(subredditName)) {
-                return prevFavorites.filter(fav => fav !== subredditName);
-            } else {
-                return [...prevFavorites, subredditName];
-            }
-        });
-    };
+  const toggleFavorite = (subredditName: string) => {
+    setFavorites(prevFavorites => {
+      if (prevFavorites.includes(subredditName)) {
+        return prevFavorites.filter(fav => fav !== subredditName);
+      } else {
+        return [...prevFavorites, subredditName];
+      }
+    });
+  };
 
-    const isFavorite = (subredditName: string) => favorites.includes(subredditName);
+  const isFavorite = (subredditName: string) => favorites.includes(subredditName);
 
   return (
     <div className="container mx-auto p-4">
@@ -281,26 +273,26 @@ export default function Home() {
         {error && <p className="text-red-500 mt-2">{error}</p>}
       </div>
 
-      {/* Sorting and Filtering */}
-            <div className="flex space-x-4 mb-4">
-                <select
-                    value={mediaFilter}
-                    onChange={(e) => setMediaFilter(e.target.value)}
-                    className="border rounded px-2 py-1"
-                >
-                    <option value="all">All Media</option>
-                    <option value="images">Images Only</option>
-                    <option value="videos">Videos Only</option>
-                </select>
-            </div>
+      {/* Filtering */}
+      <div className="flex space-x-4 mb-4">
+        <select
+          value={mediaFilter}
+          onChange={(e) => setMediaFilter(e.target.value)}
+          className="border rounded px-2 py-1"
+        >
+          <option value="all">All Media</option>
+          <option value="images">Images Only</option>
+          <option value="videos">Videos Only</option>
+        </select>
+      </div>
 
       {/* Media Gallery */}
       <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
         {posts.map((post, index) => (
           <div key={index} className="relative" ref={posts.length === index + 1 ? lastPostRef : null}>
             <Card onClick={() => handleThumbnailClick(post)} className="overflow-hidden cursor-pointer">
-                 <MediaCarousel mediaUrls={post.mediaUrls} title={post.title} subreddit={post.subreddit} postId={post.postId}/>
-              </Card>
+              <MediaCarousel mediaUrls={post.mediaUrls} title={post.title} subreddit={post.subreddit} postId={post.postId} />
+            </Card>
           </div>
         ))}
       </div>
@@ -315,7 +307,7 @@ export default function Home() {
             <>
               <DialogTitle>{selectedPost.title} (From: {selectedPost.subreddit})</DialogTitle>
               <DialogDescription>From: {selectedPost.subreddit}</DialogDescription>
-              <MediaCarousel mediaUrls={selectedPost.mediaUrls} title={selectedPost.title} subreddit={selectedPost.subreddit} postId={selectedPost.postId}/>
+              <MediaCarousel mediaUrls={selectedPost.mediaUrls} title={selectedPost.title} subreddit={selectedPost.subreddit} postId={selectedPost.postId} />
               <Button asChild>
                 <a href={`https://www.reddit.com/r/${selectedPost.subreddit}/comments/${selectedPost.postId}`} target="_blank" rel="noopener noreferrer">
                   Source
