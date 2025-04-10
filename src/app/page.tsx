@@ -188,6 +188,11 @@ export default function Home() {
               ) : (
                 <img src={selectedPost.mediaUrl} alt={selectedPost.title} className="w-full h-auto" />
               )}
+              <Button asChild>
+                <a href={`https://www.reddit.com/r/${selectedPost.subreddit}/comments/${selectedPost.postId}`} target="_blank" rel="noopener noreferrer">
+                  Source
+                </a>
+              </Button>
             </>
           )}
         </DialogContent>
