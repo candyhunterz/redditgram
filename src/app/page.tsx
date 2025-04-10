@@ -42,7 +42,7 @@ const parseSubreddits = (input: string): string[] => {
 const POSTS_PER_LOAD = 20; // Number of posts to fetch *per subreddit* per request
 
 
-// --- MediaCarousel Component (Keep the previous version with button fixes) ---
+// --- MediaCarousel Component (Updated with Tap Overlay Fix) ---
 interface MediaCarouselProps {
   mediaUrls: string[];
   title: string;
@@ -85,23 +85,15 @@ const MediaCarousel: React.FC<MediaCarouselProps> = ({ mediaUrls, title, subredd
         if (img.height > 0) {
             const aspectRatio = img.width / img.height;
             setOverlayPosition(aspectRatio < 1 ? 'bottom' : 'top');
-        } else {
-             setOverlayPosition('top');
-        }
+        } else { setOverlayPosition('top'); }
       };
-      img.onerror = () => {
-          setOverlayPosition('top');
-      }
-    } else if (isVideo) {
-        setOverlayPosition('top');
-    }
+      img.onerror = () => { setOverlayPosition('top'); }
+    } else if (isVideo) { setOverlayPosition('top'); }
   }, [currentMediaUrl, isVideo]);
 
   useEffect(() => {
-    if (isFullScreen) {
-      updateOverlayPosition();
-    }
-     setIsHovered(false);
+    if (isFullScreen) { updateOverlayPosition(); }
+    setIsHovered(false);
   }, [isFullScreen, updateOverlayPosition]);
 
   useEffect(() => {
@@ -118,69 +110,62 @@ const MediaCarousel: React.FC<MediaCarouselProps> = ({ mediaUrls, title, subredd
 
   return (
     <div
-      className="relative group w-full h-full bg-black"
+      className="relative group w-full h-full bg-black" // Ensure background for consistency
       onMouseEnter={isFullScreen ? handleMouseEnter : undefined}
       onMouseLeave={isFullScreen ? handleMouseLeave : undefined}
       ref={containerRef}
     >
+      {/* Navigation Buttons - Appear on hover, high z-index */}
       {showButtons && (
         <>
-          <button
-            onClick={prevMedia}
-            aria-label="Previous Media"
-            className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full z-30 transition-opacity opacity-0 group-hover:opacity-100 focus:opacity-100"
-          >
-            <ChevronLeft size={24} />
-          </button>
-          <button
-            onClick={nextMedia}
-            aria-label="Next Media"
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full z-30 transition-opacity opacity-0 group-hover:opacity-100 focus:opacity-100"
-          >
-            <ChevronRight size={24}/>
-          </button>
+          <button onClick={prevMedia} aria-label="Previous Media" className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full z-30 transition-opacity opacity-0 group-hover:opacity-100 focus:opacity-100"> <ChevronLeft size={24} /> </button>
+          <button onClick={nextMedia} aria-label="Next Media" className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full z-30 transition-opacity opacity-0 group-hover:opacity-100 focus:opacity-100"> <ChevronRight size={24}/> </button>
+          {/* Dots Indicator */}
           <div className="absolute bottom-3 left-0 right-0 flex justify-center space-x-1.5 z-20 pointer-events-none">
-            {validMediaUrls.map((_, index) => (
-              <span
-                key={index}
-                className={`h-2 w-2 rounded-full ${index === currentMediaIndex ? 'bg-white scale-110' : 'bg-gray-400 opacity-70'} transition-all`}
-              />
-            ))}
+            {validMediaUrls.map((_, index) => ( <span key={index} className={`h-2 w-2 rounded-full ${index === currentMediaIndex ? 'bg-white scale-110' : 'bg-gray-400 opacity-70'} transition-all`} /> ))}
           </div>
         </>
       )}
+
+      {/* Media Content Container */}
       <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+        {/* --- Video or Image Element --- */}
          {isVideo ? (
             <video
-               key={`${currentMediaUrl}-${currentMediaIndex}`}
-               src={currentMediaUrl}
+               key={`${currentMediaUrl}-${currentMediaIndex}`} src={currentMediaUrl}
                className={cn("object-contain block", isFullScreen ? 'max-h-[90vh] max-w-[95vw]' : 'w-full h-full')}
-               controls muted playsInline autoPlay={isFullScreen} loop
+               // Controls are important for fullscreen, less so for grid if overlay is used
+               controls={isFullScreen} // Only show controls in fullscreen
+               muted playsInline autoPlay={isFullScreen} loop
+               // Prevent default click behavior in grid view by removing pointer events *if* overlay wasn't used
+               // style={!isFullScreen ? { pointerEvents: 'none' } : {}}
             />
          ) : (
             <img
-                key={`${currentMediaUrl}-${currentMediaIndex}`}
-                src={currentMediaUrl}
-                alt={title}
+                key={`${currentMediaUrl}-${currentMediaIndex}`} src={currentMediaUrl} alt={title}
                 className={cn("object-contain block", isFullScreen ? 'max-h-[90vh] max-w-[95vw]' : 'w-full h-full')}
                 loading="lazy"
             />
          )}
+         {/* --- End Video or Image Element --- */}
+
+        {/* *** TAP OVERLAY for Grid View *** */}
+        {!isFullScreen && (
+            <div
+                className="absolute inset-0 z-10 cursor-pointer"
+                aria-hidden="true" // It's just for intercepting clicks, Card provides semantics
+                // The actual onClick is on the PARENT Card component in page.tsx
+            />
+        )}
+        {/* *** End TAP OVERLAY *** */}
+
+
+        {/* Title Overlay (Fullscreen only) */}
         {isFullScreen && (
           <div
-            className={cn(
-              "absolute left-0 w-full bg-gradient-to-t from-black/70 via-black/40 to-transparent text-white transition-opacity duration-300 p-4 z-20 pointer-events-none",
-              overlayPosition === 'top' ? 'top-0 bg-gradient-to-b' : 'bottom-0 bg-gradient-to-t',
-              isHovered ? 'opacity-100' : 'opacity-0'
-            )}
-          >
+            className={cn( "absolute left-0 w-full bg-gradient-to-t from-black/70 via-black/40 to-transparent text-white transition-opacity duration-300 p-4 z-20 pointer-events-none", overlayPosition === 'top' ? 'top-0 bg-gradient-to-b' : 'bottom-0 bg-gradient-to-t', isHovered ? 'opacity-100' : 'opacity-0' )} >
              <DialogTitle className="text-base md:text-lg font-semibold line-clamp-2">
-                {title} (From: <a
-                    href={`https://www.reddit.com/r/${subreddit}/comments/${postId}`}
-                    target="_blank" rel="noopener noreferrer" className="underline pointer-events-auto"
-                    onClick={(e) => e.stopPropagation()} >
-                    r/{subreddit}
-                </a>)
+                {title} (From: <a href={`https://www.reddit.com/r/${subreddit}/comments/${postId}`} target="_blank" rel="noopener noreferrer" className="underline pointer-events-auto" onClick={(e) => e.stopPropagation()} > r/{subreddit} </a>)
              </DialogTitle>
           </div>
         )}
