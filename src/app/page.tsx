@@ -7,6 +7,8 @@ import { RedditPost, getHotPosts } from "@/services/reddit";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const isValidSubreddit = (subreddit: string): boolean => {
   // Basic validation, can be expanded
@@ -14,6 +16,74 @@ const isValidSubreddit = (subreddit: string): boolean => {
 };
 
 const POSTS_PER_LOAD = 20; // Number of posts to load each time
+
+// MediaCarousel component to handle multiple images/videos
+interface MediaCarouselProps {
+  mediaUrls: string[];
+  title: string;
+  subreddit: string;
+  postId: string;
+}
+
+const MediaCarousel: React.FC<MediaCarouselProps> = ({ mediaUrls, title, subreddit, postId }) => {
+  const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+  const { toast } = useToast();
+
+  const nextMedia = () => {
+    setCurrentMediaIndex((prevIndex) => (prevIndex + 1) % mediaUrls.length);
+  };
+
+  const prevMedia = () => {
+    setCurrentMediaIndex((prevIndex) => (prevIndex - 1 + mediaUrls.length) % mediaUrls.length);
+  };
+
+  return (
+    <div className="relative">
+      {mediaUrls.length > 1 && (
+        <>
+          <button
+            onClick={prevMedia}
+            className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/20 text-white p-2 rounded-full z-10"
+          >
+            <ChevronLeft />
+          </button>
+          <button
+            onClick={nextMedia}
+            className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/20 text-white p-2 rounded-full z-10"
+          >
+            <ChevronRight />
+          </button>
+          <div className="absolute bottom-2 left-0 right-0 flex justify-center space-x-2 z-10">
+            {mediaUrls.map((_, index) => (
+              <span
+                key={index}
+                className={`h-2 w-2 rounded-full ${index === currentMediaIndex ? 'bg-white' : 'bg-gray-500'}`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      {mediaUrls[currentMediaIndex].endsWith('.mp4') ? (
+        <video
+          src={mediaUrls[currentMediaIndex]}
+          alt={title}
+          className="w-full h-auto object-cover aspect-square"
+          controls
+          muted
+          playsInline
+          autoPlay
+        />
+      ) : (
+        <img
+          src={mediaUrls[currentMediaIndex]}
+          alt={title}
+          className="w-full h-auto object-cover aspect-square"
+        />
+      )}
+    </div>
+  );
+};
 
 export default function Home() {
   const [subreddits, setSubreddits] = useState<string>('');
@@ -25,6 +95,9 @@ export default function Home() {
   const [hasMore, setHasMore] = useState(true);
   const [fetchInitiated, setFetchInitiated] = useState(false); // Track if fetch has been initiated
   const [cache, setCache] = useState<{ [key: string]: RedditPost[] }>({}); // Add cache state
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [mediaFilter, setMediaFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('hot');
 
   const observer = useRef<IntersectionObserver>();
   const lastPostRef = useCallback(
@@ -54,7 +127,10 @@ export default function Home() {
     setFetchInitiated(true); // Mark that fetch has been initiated
     setCache({}); // Clear cache
 
-    const subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
+    let subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
+        if (subs.length === 0) {
+            subs = favorites; // If no subreddits entered, use favorites
+        }
 
     if (subs.every(isValidSubreddit)) {
       try {
@@ -63,7 +139,7 @@ export default function Home() {
             if (cache[sub]) {
               return { sub, posts: cache[sub], after: null };
             } else {
-              const { posts, after } = await getHotPosts(sub, undefined, POSTS_PER_LOAD);
+              const { posts, after } = await getHotPosts(sub, after, POSTS_PER_LOAD);
               setCache(prevCache => ({ ...prevCache, [sub]: posts }));
               return { sub, posts, after };
             }
@@ -74,10 +150,15 @@ export default function Home() {
           return acc.concat(curr.posts.map(post => ({ ...post, subreddit: curr.sub })));
         }, []);
 
-        const mediaPosts = flattenedPosts.filter(post => {
-          return post.mediaUrl.endsWith('.jpg') || post.mediaUrl.endsWith('.jpeg') || post.mediaUrl.endsWith('.png') || post.mediaUrl.endsWith('.mp4');
-        });
-        setPosts(mediaPosts);
+        const filteredPosts = flattenedPosts.filter(post => {
+                    if (mediaFilter === 'images') {
+                        return post.mediaUrls.some(url => url.endsWith('.jpg') || url.endsWith('.jpeg') || url.endsWith('.png'));
+                    } else if (mediaFilter === 'videos') {
+                        return post.mediaUrls.some(url => url.endsWith('.mp4'));
+                    }
+                    return true; // 'all' or invalid filter
+                });
+        setPosts(filteredPosts);
 
         // Set 'after' value based on last subreddit's response
         setAfter(initialPosts[initialPosts.length - 1].after);
@@ -96,7 +177,10 @@ export default function Home() {
     if (isLoading || !hasMore) return;
     setIsLoading(true);
 
-    const subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
+    let subs = subreddits.split(',').map(s => s.trim()).filter(s => s !== '');
+        if (subs.length === 0) {
+            subs = favorites; // If no subreddits entered, use favorites
+        }
 
     if (subs.every(isValidSubreddit)) {
       try {
@@ -111,11 +195,16 @@ export default function Home() {
           return acc.concat(curr.posts.map(post => ({ ...post, subreddit: curr.sub })));
         }, []);
 
-        const mediaPosts = flattenedPosts.filter(post => {
-          return post.mediaUrl.endsWith('.jpg') || post.mediaUrl.endsWith('.jpeg') || post.mediaUrl.endsWith('.png') || post.mediaUrl.endsWith('.mp4');
-        });
+        const filteredPosts = flattenedPosts.filter(post => {
+                    if (mediaFilter === 'images') {
+                        return post.mediaUrls.some(url => url.endsWith('.jpg') || url.endsWith('.jpeg') || url.endsWith('.png'));
+                    } else if (mediaFilter === 'videos') {
+                        return post.mediaUrls.some(url => url.endsWith('.mp4'));
+                    }
+                    return true; // 'all' or invalid filter
+                });
 
-        setPosts(prevPosts => [...prevPosts, ...mediaPosts]);
+        setPosts(prevPosts => [...prevPosts, ...filteredPosts]);
 
         // Update 'after' and 'hasMore' based on the responses
         setAfter(newPosts[newPosts.length - 1].newAfter);
@@ -138,6 +227,18 @@ export default function Home() {
     setSelectedPost(null);
   };
 
+    const toggleFavorite = (subredditName: string) => {
+        setFavorites(prevFavorites => {
+            if (prevFavorites.includes(subredditName)) {
+                return prevFavorites.filter(fav => fav !== subredditName);
+            } else {
+                return [...prevFavorites, subredditName];
+            }
+        });
+    };
+
+    const isFavorite = (subredditName: string) => favorites.includes(subredditName);
+
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Sub Gallery</h1>
@@ -156,17 +257,26 @@ export default function Home() {
         {error && <p className="text-red-500 mt-2">{error}</p>}
       </div>
 
+      {/* Sorting and Filtering */}
+            <div className="flex space-x-4 mb-4">
+                <select
+                    value={mediaFilter}
+                    onChange={(e) => setMediaFilter(e.target.value)}
+                    className="border rounded px-2 py-1"
+                >
+                    <option value="all">All Media</option>
+                    <option value="images">Images Only</option>
+                    <option value="videos">Videos Only</option>
+                </select>
+            </div>
+
       {/* Media Gallery */}
       <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
         {posts.map((post, index) => (
           <div key={index} className="relative" ref={posts.length === index + 1 ? lastPostRef : null}>
             <button onClick={() => handleThumbnailClick(post)} className="w-full h-full block">
               <Card className="overflow-hidden cursor-pointer">
-                {post.mediaUrl.endsWith('.mp4') ? (
-                  <video src={post.mediaUrl} alt={post.title} className="w-full h-auto object-cover aspect-square" muted playsInline autoPlay />
-                ) : (
-                  <img src={post.mediaUrl} alt={post.title} className="w-full h-auto object-cover aspect-square" />
-                )}
+                 <MediaCarousel mediaUrls={post.mediaUrls} title={post.title} subreddit={post.subreddit} postId={post.postId}/>
               </Card>
             </button>
           </div>
@@ -183,11 +293,7 @@ export default function Home() {
             <>
               <DialogTitle>{selectedPost.title} (From: {selectedPost.subreddit})</DialogTitle>
               <DialogDescription>From: {selectedPost.subreddit}</DialogDescription>
-              {selectedPost.mediaUrl.endsWith('.mp4') ? (
-                <video src={selectedPost.mediaUrl} alt={selectedPost.title} className="w-full h-auto" controls playsInline autoPlay />
-              ) : (
-                <img src={selectedPost.mediaUrl} alt={selectedPost.title} className="w-full h-auto" />
-              )}
+              <MediaCarousel mediaUrls={selectedPost.mediaUrls} title={selectedPost.title} subreddit={selectedPost.subreddit} postId={selectedPost.postId}/>
               <Button asChild>
                 <a href={`https://www.reddit.com/r/${selectedPost.subreddit}/comments/${selectedPost.postId}`} target="_blank" rel="noopener noreferrer">
                   Source
@@ -207,4 +313,3 @@ export default function Home() {
     </div>
   );
 }
-
