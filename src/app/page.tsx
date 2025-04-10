@@ -133,15 +133,17 @@ export default function Home() {
         }
 
     let tempSubs = subs;
+    let afterValue: string | undefined = after || undefined;
+
 
     if (tempSubs.every(isValidSubreddit)) {
       try {
         const initialPosts = await Promise.all(
           tempSubs.map(async sub => {
             // Pass undefined if after is null
-            const { posts, after: newAfter } = await getHotPosts(sub, after || undefined, POSTS_PER_LOAD);
-            setCache(prevCache => ({ ...prevCache, [sub]: posts }));
-            return { sub, posts, after: newAfter };
+            const { posts: fetchedPosts, after: newAfter } = await getHotPosts(sub, afterValue, POSTS_PER_LOAD);
+            setCache(prevCache => ({ ...prevCache, [sub]: fetchedPosts }));
+            return { sub, posts: fetchedPosts, after: newAfter };
           })
         );
 
@@ -149,14 +151,18 @@ export default function Home() {
           return acc.concat(curr.posts.map(post => ({ ...post, subreddit: curr.sub })));
         }, []);
 
-                const filteredPosts = flattenedPosts.filter(post => {
-                    if (mediaFilter === 'images') {
-                        return post.mediaUrls.some(url => url.endsWith('.jpg') || url.endsWith('.jpeg') || url.endsWith('.png'));
-                    } else if (mediaFilter === 'videos') {
-                        return post.mediaUrls.some(url => url.endsWith('.mp4'));
-                    }
-                    return true; // 'all' or invalid filter
-                });
+        const filteredPosts = flattenedPosts.filter(post => {
+            if (mediaFilter === 'all') {
+                return true;
+            }
+            if (mediaFilter === 'images') {
+                return post.mediaUrls.some(url => /\.(jpg|jpeg|png)$/i.test(url));
+            }
+            if (mediaFilter === 'videos') {
+                return post.mediaUrls.some(url => url.endsWith('.mp4'));
+            }
+            return true;
+        });
 
         setPosts(filteredPosts);
 
@@ -189,13 +195,14 @@ export default function Home() {
         }
 
     let tempSubs = subs;
+    let afterValue: string | undefined = after || undefined;
 
     if (tempSubs.every(isValidSubreddit)) {
       try {
         const newPosts = await Promise.all(
           tempSubs.map(async sub => {
-            const { posts, after: newAfter } = await getHotPosts(sub, after || undefined, POSTS_PER_LOAD);
-            return { sub, posts, newAfter };
+            const { posts: fetchedPosts, after: newAfter } = await getHotPosts(sub, afterValue, POSTS_PER_LOAD);
+            return { sub, posts: fetchedPosts, newAfter };
           })
         );
 
@@ -203,14 +210,18 @@ export default function Home() {
           return acc.concat(curr.posts.map(post => ({ ...post, subreddit: curr.sub })));
         }, []);
 
-                const filteredPosts = flattenedPosts.filter(post => {
-                    if (mediaFilter === 'images') {
-                        return post.mediaUrls.some(url => url.endsWith('.jpg') || url.endsWith('.jpeg') || url.endsWith('.png'));
-                    } else if (mediaFilter === 'videos') {
-                        return post.mediaUrls.some(url => url.endsWith('.mp4'));
-                    }
-                    return true; // 'all' or invalid filter
-                });
+        const filteredPosts = flattenedPosts.filter(post => {
+            if (mediaFilter === 'all') {
+                return true;
+            }
+            if (mediaFilter === 'images') {
+                return post.mediaUrls.some(url => /\.(jpg|jpeg|png)$/i.test(url));
+            }
+            if (mediaFilter === 'videos') {
+                return post.mediaUrls.some(url => url.endsWith('.mp4'));
+            }
+            return true;
+        });
 
         setPosts(prevPosts => [...prevPosts, ...filteredPosts]);
 
