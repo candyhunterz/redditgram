@@ -81,9 +81,13 @@ body {
 
 @layer base {
   * {
-    @apply border-border;
+    /* Apply the border color directly using the CSS variable */
+    border-color: hsl(var(--border));
   }
   body {
-    @apply bg-background text-foreground;
+    /* Apply background and text colors using variables */
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    /* font-family applied via layout.tsx className is preferred */
   }
 }
