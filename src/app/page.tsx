@@ -94,8 +94,8 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({ mediaUrls, tit
   const currentMediaUrl = validMediaUrls[currentMediaIndex];
   const isVideo = currentMediaUrl?.endsWith('.mp4');
 
-  const handleMouseEnter = useCallback(() => setIsHovered(true), []);
-  const handleMouseLeave = useCallback(() => setIsHovered(false), []);
+  const handleMouseEnter = useCallback(() => { if (isFullScreen) setIsHovered(true); }, [isFullScreen]);
+  const handleMouseLeave = useCallback(() => { if (isFullScreen) setIsHovered(false); }, [isFullScreen]);
 
   const updateOverlayPosition = useCallback(() => {
     if (containerRef.current && currentMediaUrl && !isVideo) {
@@ -212,7 +212,21 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({ mediaUrls, tit
          {/* Grid Tap Overlay */}
          {!isFullScreen && ( <div className="absolute inset-0 z-10 cursor-pointer" aria-hidden="true" /> )}
          {/* Fullscreen Title Overlay */}
-         {isFullScreen && ( <div className={cn( "absolute left-0 w-full bg-gradient-to-t ...", isHovered ? 'opacity-100' : 'opacity-0' )} > <DialogTitle /* ... */ /> </div> )}
+         {isFullScreen && (
+                    <div
+                        className={cn(
+                            "absolute left-0 w-full bg-gradient-to-t from-black/70 via-black/40 to-transparent text-white p-4 z-20 pointer-events-none",
+                            "transition-opacity duration-300 ease-in-out", // Ensure transition class
+                            overlayPosition === 'top' ? 'top-0 bg-gradient-to-b' : 'bottom-0 bg-gradient-to-t',
+                            // Control opacity based on the isHovered state
+                            isHovered ? 'opacity-100' : 'opacity-0'
+                        )}
+                    >
+                        <DialogTitle className="text-base md:text-lg font-semibold line-clamp-2">
+                            {title} (From: <a href={`https://www.reddit.com/r/${subreddit}/comments/${postId}`} target="_blank" rel="noopener noreferrer" className="underline pointer-events-auto" onClick={(e) => e.stopPropagation()} > r/{subreddit} </a>)
+                        </DialogTitle>
+                    </div>
+                )}
       </div>
     </div>
   );
