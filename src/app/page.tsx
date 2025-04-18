@@ -17,9 +17,7 @@ import {
   DialogContent,
   DialogTitle,
   DialogDescription,
-  DialogClose,
-  DialogHeader,
-  DialogTrigger
+  DialogClose
 } from "@/components/ui/dialog";
 // Import UI components for sorting & save/load
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -39,6 +37,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+// *** Import Masonry Component ***
+import Masonry from 'react-masonry-css';
 
 
 // --- Helper Functions ---
@@ -56,7 +56,7 @@ const parseSubreddits = (input: string): string[] => {
 const POSTS_PER_LOAD = 20; // Number of posts to fetch *per subreddit* per request
 const LOCAL_STORAGE_SAVED_LISTS_KEY = "savedSubredditLists"; // Key for localStorage
 
-// --- MediaCarousel Component (Memoized, with Tap Overlay Fix, Keyboard Nav, Enhanced Dots, Swipe Gestures) ---
+// --- MediaCarousel Component (Updated for Masonry Layout) ---
 interface MediaCarouselProps {
   mediaUrls: string[];
   title: string;
@@ -181,48 +181,38 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({ mediaUrls, tit
 
   return (
     <div
-      className="relative group w-full h-full bg-black select-none" // Added select-none
+      className="relative group w-full h-full bg-black select-none" // Added relative
       onMouseEnter={isFullScreen ? handleMouseEnter : undefined}
       onMouseLeave={isFullScreen ? handleMouseLeave : undefined}
-      // Add touch handlers ONLY when fullscreen
       onTouchStart={isFullScreen ? handleTouchStart : undefined}
       onTouchMove={isFullScreen ? handleTouchMove : undefined}
       onTouchEnd={isFullScreen ? handleTouchEnd : undefined}
       ref={containerRef}
     >
+        
+
       {/* Navigation Buttons */}
       {showButtons && (
         <>
           <button onClick={prevMedia} aria-label="Previous Media" className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full z-30 transition-opacity duration-300 opacity-0 group-hover:opacity-100 focus:opacity-100 active:scale-90"> <ChevronLeft size={24} /> </button>
           <button onClick={nextMedia} aria-label="Next Media" className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full z-30 transition-opacity duration-300 opacity-0 group-hover:opacity-100 focus:opacity-100 active:scale-90"> <ChevronRight size={24}/> </button>
-          {/* Dots Indicator */}
           <div className="absolute bottom-3 left-0 right-0 flex justify-center space-x-1.5 z-20 pointer-events-none">
-            {validMediaUrls.map((_, index) => (
-              <span
-                key={index}
-                className={cn( 'h-2 w-2 rounded-full transition-all duration-300', index === currentMediaIndex ? 'bg-white scale-110' : 'bg-gray-400 opacity-50 scale-90' )}
-              />
-             ))}
+            {validMediaUrls.map((_, index) => ( <span key={index} className={cn( 'h-2 w-2 rounded-full transition-all duration-300', index === currentMediaIndex ? 'bg-white scale-110' : 'bg-gray-400 opacity-50 scale-90' )} /> ))}
           </div>
         </>
       )}
       {/* Media Content Container */}
       <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+         {/* *** UPDATED img/video styles for Masonry *** */}
          {isVideo ? (
-            <video key={`${currentMediaUrl}-${currentMediaIndex}`} src={currentMediaUrl} className={cn("object-contain block", isFullScreen ? 'max-h-[90vh] max-w-[95vw]' : 'w-full h-full')} controls={isFullScreen} muted playsInline autoPlay={isFullScreen} loop />
+            <video key={`${currentMediaUrl}-${currentMediaIndex}`} src={currentMediaUrl} className={cn("object-contain block w-full", isFullScreen ? 'max-h-[90vh] max-w-[95vw]' : 'h-auto')} controls={isFullScreen} muted={!isFullScreen} playsInline autoPlay={isFullScreen} loop />
          ) : (
-            <img key={`${currentMediaUrl}-${currentMediaIndex}`} src={currentMediaUrl} alt={title} className={cn("object-contain block", isFullScreen ? 'max-h-[90vh] max-w-[95vw]' : 'w-full h-full')} loading="lazy" />
+            <img key={`${currentMediaUrl}-${currentMediaIndex}`} src={currentMediaUrl} alt={title} className={cn("object-cover block w-full", isFullScreen ? 'max-h-[90vh] max-w-[95vw] object-contain' : 'h-auto')} loading="lazy" /> // Use object-cover for grid, object-contain for fullscreen img
          )}
          {/* Grid Tap Overlay */}
          {!isFullScreen && ( <div className="absolute inset-0 z-10 cursor-pointer" aria-hidden="true" /> )}
          {/* Fullscreen Title Overlay */}
-         {isFullScreen && (
-           <div className={cn( "absolute left-0 w-full bg-gradient-to-t from-black/70 via-black/40 to-transparent text-white transition-opacity duration-300 p-4 z-20 pointer-events-none", overlayPosition === 'top' ? 'top-0 bg-gradient-to-b' : 'bottom-0 bg-gradient-to-t', isHovered ? 'opacity-100' : 'opacity-0' )} >
-             <DialogTitle className="text-base md:text-lg font-semibold line-clamp-2">
-                {title} (From: <a href={`https://www.reddit.com/r/${subreddit}/comments/${postId}`} target="_blank" rel="noopener noreferrer" className="underline pointer-events-auto" onClick={(e) => e.stopPropagation()} > r/{subreddit} </a>)
-             </DialogTitle>
-           </div>
-         )}
+         {isFullScreen && ( <div className={cn( "absolute left-0 w-full bg-gradient-to-t ...", isHovered ? 'opacity-100' : 'opacity-0' )} > <DialogTitle /* ... */ /> </div> )}
       </div>
     </div>
   );
@@ -397,13 +387,20 @@ export default function Home() {
         }
    }, [selectedListName, toast]);
 
+   // --- Masonry Breakpoint Configuration ---
+   const breakpointColumnsObj = {
+        default: 6, // Corresponds to lg:grid-cols-6
+        1280: 5,    // Corresponds to md:grid-cols-5 (approx. lg breakpoint)
+        1024: 4,    // Corresponds to sm:grid-cols-4 (approx. md breakpoint)
+        768: 3,     // Corresponds to base grid-cols-3 (approx. sm breakpoint)
+   };
+
    // --- Render ---
    const savedListNames = Object.keys(savedLists);
 
   return (
     <div className="container mx-auto px-2 py-4 sm:px-4 sm:py-6 min-h-screen flex flex-col">
       <header className="mb-6 flex-shrink-0">
-
         <div className="max-w-xl mx-auto space-y-3">
             <div className="flex flex-col sm:flex-row items-stretch gap-2">
                  <Input type="text" aria-label="Enter subreddit names separated by commas" placeholder="Enter subreddits..." value={subredditInput} onChange={(e) => setSubredditInput(e.target.value)} className="flex-grow text-base" onKeyDown={(e) => { if (e.key === 'Enter' && !isLoading) fetchInitialPosts(); }} />
@@ -444,74 +441,47 @@ export default function Home() {
          {error && <p className="text-red-500 mt-2 text-center text-sm">{error}</p>}
       </header>
 
-      
-
       <main className="flex-grow mt-2">
-        {isLoading && posts.length === 0 && !error && ( <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1.5"> {Array.from({ length: 18 }).map((_, index) => ( <Skeleton key={`skeleton-${index}`} className="aspect-square" /> ))} </div> )}
+        {isLoading && posts.length === 0 && !error && (
+            <Masonry breakpointCols={breakpointColumnsObj} className="my-masonry-grid flex gap-1.5" columnClassName="my-masonry-grid_column">
+                 {Array.from({ length: 18 }).map((_, index) => ( <Skeleton key={`skeleton-${index}`} className="h-64 w-full mb-1.5" /> ))}
+            </Masonry>
+        )}
         {fetchInitiated && posts.length === 0 && !isLoading && !error && ( <p className="text-center text-muted-foreground mt-10">No posts found.</p> )}
         {posts.length > 0 && (
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1.5">
+          <Masonry breakpointCols={breakpointColumnsObj} className="my-masonry-grid flex gap-1.5" columnClassName="my-masonry-grid_column">
             {posts.map((post) => {
                 const firstUrl=post?.mediaUrls?.[0]; const isVideoPost=firstUrl&&firstUrl.endsWith('.mp4'); const isGalleryPost=post?.mediaUrls?.length>1;
                 return (
-                <div key={`${post.subreddit}-${post.postId}`} ref={posts[posts.length-1]===post?lastPostRef:null}>
-                 <Card onClick={()=>handleThumbnailClick(post)} className="group relative overflow-hidden cursor-pointer aspect-square bg-gray-100 dark:bg-gray-800 hover:shadow-lg hover:scale-[1.02] active:scale-95 transition-all duration-200 flex items-center justify-center">
+                // This div is the direct child targeted by column CSS for margin
+                <div key={`${post.subreddit}-${post.postId}`} ref={posts[posts.length-1]===post?lastPostRef:null} className="mb-1.5"> {/* Added bottom margin matching gap */}
+                 <Card onClick={()=>handleThumbnailClick(post)} className="group relative overflow-hidden cursor-pointer bg-gray-100 dark:bg-gray-800 hover:shadow-lg hover:scale-[1.02] active:scale-95 transition-all duration-200 flex items-center justify-center">
                      {(isVideoPost || isGalleryPost) && ( <div className="absolute top-1 right-1 z-20 p-1 rounded-full bg-black/40 text-white transition-opacity opacity-70 group-hover:opacity-100"> {isVideoPost && <Video className="h-3 w-3" />} {isGalleryPost && !isVideoPost && <GalleryIcon className="h-3 w-3"/>} </div> )}
                      <MediaCarousel mediaUrls={post.mediaUrls} title={post.title} subreddit={post.subreddit} postId={post.postId} />
                  </Card>
                 </div>);
             })}
-           </div>
+           </Masonry>
         )}
         {isLoading && posts.length > 0 && ( <div className="flex justify-center items-center gap-2 text-center mt-6 p-4 text-muted-foreground"> <Loader2 className="h-4 w-4 animate-spin" /> Loading more... </div> )}
         {!hasMore && fetchInitiated && posts.length > 0 && ( <p className="text-center mt-6 p-4 text-muted-foreground">You've reached the end!</p> )}
       </main>
 
       <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
-        <DialogContent
-          // Removed relative here, using wrapper below
-          className="max-w-none w-[95vw] h-[95vh] p-0 sm:p-0 bg-black/80 border-none overflow-hidden backdrop-blur-sm"
-        >
-          {/* Accessibility titles first */}
-          <DialogTitle className="sr-only">
-            Expanded view: {selectedPost?.title || 'Reddit Post'}
-          </DialogTitle>
-          <DialogDescription className="sr-only">
-             Expanded view of Reddit post: {selectedPost?.title || 'Content'} from subreddit r/{selectedPost?.subreddit || ''}. Use arrow keys or buttons to navigate media if available. Press Escape or click the close button to exit.
-          </DialogDescription>
-
-          {/* === Add a Positioned Wrapper for Content + Close Button === */}
-          <div className="relative w-full h-full flex items-center justify-center"> {/* This wrapper is now relative and centers content */}
-
-            {/* Conditional Content Area */}
-            {selectedPost ? (
-               <MediaCarousel
-                  mediaUrls={selectedPost.mediaUrls} title={selectedPost.title}
-                  subreddit={selectedPost.subreddit} postId={selectedPost.postId}
-                  isFullScreen={true}
-               />
-            ) : (
-               <div className="text-white text-xl">Loading content...</div>
-            )}
-
-            {/* Custom Close Button (positioned relative to the new wrapper) */}
-            <DialogClose asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Close dialog"
-                // Still absolute, but now relative to the div above
-                className="absolute top-2 right-2 z-50 rounded-full h-8 w-8 bg-black/30 text-white hover:bg-black/50 hover:text-white active:scale-90"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </DialogClose>
-
-          </div>
-          {/* === End Positioned Wrapper === */}
-
+        <DialogContent className="max-w-none w-[95vw] h-[95vh] p-0 bg-transparent border-none overflow-hidden flex items-center justify-center">
+            {/* This inner div now controls background, padding, backdrop, and positioning context */}
+           <div className="relative w-full h-full flex items-center justify-center bg-black/90 backdrop-blur-sm p-1 sm:p-2">
+              <DialogTitle className="sr-only"> Expanded view: {selectedPost?.title || 'Reddit Post'} </DialogTitle>
+              <DialogDescription className="sr-only"> Expanded view of Reddit post: {selectedPost?.title || 'Content'}... </DialogDescription>
+              {selectedPost ? ( <MediaCarousel mediaUrls={selectedPost.mediaUrls} title={selectedPost.title} subreddit={selectedPost.subreddit} postId={selectedPost.postId} isFullScreen={true} /> )
+                           : ( <div className="text-white text-xl">Loading content...</div> )}
+              <DialogClose asChild>
+                <Button variant="ghost" size="icon" aria-label="Close dialog" className="absolute top-2 right-2 z-50 rounded-full h-8 w-8 bg-black/30 text-white hover:bg-black/50 hover:text-white active:scale-90"> <X className="h-4 w-4" /> </Button>
+              </DialogClose>
+           </div>
         </DialogContent>
       </Dialog>
+
       <footer className="mt-16 md:mt-24 text-center text-sm text-muted-foreground flex-shrink-0 pb-6">
         <p> Built with ❤️ </p>
       </footer>

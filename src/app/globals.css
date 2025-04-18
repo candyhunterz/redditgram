@@ -91,3 +91,21 @@ body {
     /* font-family applied via layout.tsx className is preferred */
   }
 }
+
+/* --- Masonry Grid Styles --- */
+/* Adjust margins/paddings based on your gap setting (gap-1.5 = 0.375rem = 6px) */
+.my-masonry-grid {
+  display: flex;
+  margin-left: -6px; /* Adjust if you change gap */
+  width: auto;
+}
+.my-masonry-grid_column {
+  padding-left: 6px; /* Adjust to match negative margin */
+  background-clip: padding-box; /* Prevent gap background issues */
+}
+
+/* Style targeting the item wrapper div inside the column */
+.my-masonry-grid_column > div {
+  margin-bottom: 6px; /* Adjust to match gap */
+}
+/* --- End Masonry Grid Styles --- */
