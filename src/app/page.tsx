@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-// *** FILLED IMPORTS ***
+// *** Standard Imports ***
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RedditPost, getPosts, SortType, TimeFrame } from "@/services/reddit";
@@ -16,7 +16,7 @@ import {
   DialogContent,
   DialogTitle,
   DialogDescription,
-  DialogClose
+  DialogClose // Keep DialogClose import as it's used within MediaCarousel now
 } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -35,38 +35,32 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import Masonry from 'react-masonry-css';
-// *** END FILLED IMPORTS ***
+// *** End Standard Imports ***
 
 
 // --- Helper Functions & Constants ---
-// *** FILLED FROM PREVIOUS ***
 const isValidSubreddit = (subreddit: string): boolean => {
-  // Basic validation, allows alphanumeric and underscore, non-empty
   return /^[a-zA-Z0-9_]+$/.test(subreddit) && subreddit.length > 0;
 };
 
 const parseSubreddits = (input: string): string[] => {
-  // Trims whitespace and filters out empty strings after splitting by comma
   return input.split(',').map(s => s.trim()).filter(s => s !== '');
 };
 
 const POSTS_PER_LOAD = 20;
 const LOCAL_STORAGE_SAVED_LISTS_KEY = "savedSubredditLists";
-// *** END FILLED FROM PREVIOUS ***
 
 
 // --- Define Cache Types ---
-// Define the structure of the data we'll cache
 type CachedRedditResponse = {
     posts: RedditPost[];
     after: string | null;
 };
-// Define the structure of the cache Map's key
 type CacheKey = string;
 
 
-// --- MediaCarousel Component (Kept as is from previous version) ---
-// *** FILLED FROM PREVIOUS ***
+// --- MediaCarousel Component (Updated with Top Control Bar) ---
+// *** NEW MediaCarousel IMPLEMENTATION FROM SNIPPET ***
 interface MediaCarouselProps {
   mediaUrls: string[];
   title: string;
@@ -77,169 +71,172 @@ interface MediaCarouselProps {
 }
 
 const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
-    mediaUrls,
-    title,
-    subreddit,
-    postId,
-    isFullScreen = false,
-    isUnplayableVideoFormat = false
+    mediaUrls, title, subreddit, postId, isFullScreen = false, isUnplayableVideoFormat = false
 }) => {
-  const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isHovered, setIsHovered] = useState(false);
-  const [overlayPosition, setOverlayPosition] = useState<'top' | 'bottom'>('top');
+    // --- State and Refs ---
+    const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+    const containerRef = useRef<HTMLDivElement>(null);
+    // Hover state no longer needed for core functionality but kept if useful elsewhere
+    // const [isHovered, setIsHovered] = useState(false);
+    const touchStartX = useRef<number | null>(null);
+    const touchEndX = useRef<number | null>(null);
+    const swipeThreshold = 50;
 
-  const touchStartX = useRef<number | null>(null);
-  const touchEndX = useRef<number | null>(null);
-  const swipeThreshold = 50;
+    // --- Derived State & Callbacks ---
+    const validMediaUrls = Array.isArray(mediaUrls) ? mediaUrls : [];
+    const showButtons = validMediaUrls.length > 1 && !isUnplayableVideoFormat;
 
-  const validMediaUrls = Array.isArray(mediaUrls) ? mediaUrls : [];
-  const showButtons = validMediaUrls.length > 1 && !isUnplayableVideoFormat;
+    const nextMedia = useCallback(() => {
+        if (validMediaUrls.length > 0) {
+           setCurrentMediaIndex((prevIndex) => (prevIndex + 1) % validMediaUrls.length);
+        }
+    }, [validMediaUrls.length]);
 
-  const nextMedia = useCallback(() => {
-    if (validMediaUrls.length > 0) {
-       setCurrentMediaIndex((prevIndex) => (prevIndex + 1) % validMediaUrls.length);
-    }
-  }, [validMediaUrls.length]);
+    const prevMedia = useCallback(() => {
+        if (validMediaUrls.length > 0) {
+            setCurrentMediaIndex((prevIndex) => (prevIndex - 1 + validMediaUrls.length) % validMediaUrls.length);
+        }
+    }, [validMediaUrls.length]);
 
-  const prevMedia = useCallback(() => {
-     if (validMediaUrls.length > 0) {
-        setCurrentMediaIndex((prevIndex) => (prevIndex - 1 + validMediaUrls.length) % validMediaUrls.length);
-     }
-  }, [validMediaUrls.length]);
+    const currentMediaUrl = validMediaUrls[currentMediaIndex];
+    const isVideo = currentMediaUrl?.endsWith('.mp4') && !isUnplayableVideoFormat;
 
-  const currentMediaUrl = validMediaUrls[currentMediaIndex];
-  const isVideo = currentMediaUrl?.endsWith('.mp4') && !isUnplayableVideoFormat;
-
-  const handleMouseEnter = useCallback(() => { if (isFullScreen) setIsHovered(true); }, [isFullScreen]);
-  const handleMouseLeave = useCallback(() => { if (isFullScreen) setIsHovered(false); }, [isFullScreen]);
-
-  const updateOverlayPosition = useCallback(() => {
-    if (containerRef.current && currentMediaUrl && !isVideo && !isUnplayableVideoFormat) {
-      const img = new Image();
-      img.src = currentMediaUrl;
-      img.onload = () => {
-        if (img.height > 0) {
-            const aspectRatio = img.width / img.height;
-            setOverlayPosition(aspectRatio < 1 ? 'bottom' : 'top');
-        } else { setOverlayPosition('top'); }
-      };
-      img.onerror = () => { setOverlayPosition('top'); }
-    } else { setOverlayPosition('top'); }
-  }, [currentMediaUrl, isVideo, isUnplayableVideoFormat]);
-
-  useEffect(() => {
-    if (isFullScreen) { updateOverlayPosition(); }
-    setIsHovered(false);
-  }, [isFullScreen, updateOverlayPosition]);
-
-  useEffect(() => {
-     setCurrentMediaIndex(0);
-     setIsHovered(false);
-  }, [mediaUrls]);
-
-  useEffect(() => {
-    if (!isFullScreen || !showButtons) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-        if (event.key === 'ArrowRight') { nextMedia(); }
-        else if (event.key === 'ArrowLeft') { prevMedia(); }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => { window.removeEventListener('keydown', handleKeyDown); };
-  }, [isFullScreen, showButtons, nextMedia, prevMedia]);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
+    // --- Swipe Handlers ---
+    const handleTouchStart = (e: React.TouchEvent) => {
       if (!isFullScreen || !showButtons) return;
       touchEndX.current = null; touchStartX.current = e.targetTouches[0].clientX;
-  };
-  const handleTouchMove = (e: React.TouchEvent) => {
-      if (!touchStartX.current || !isFullScreen || !showButtons) return;
-      touchEndX.current = e.targetTouches[0].clientX;
-  };
-  const handleTouchEnd = (e: React.TouchEvent) => {
-      if (!touchStartX.current || touchEndX.current === null || !isFullScreen || !showButtons) return;
-      const diffX = touchStartX.current - touchEndX.current;
-      if (Math.abs(diffX) > swipeThreshold) { if (diffX > 0) { nextMedia(); } else { prevMedia(); } }
-      touchStartX.current = null; touchEndX.current = null;
-  };
+    };
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!touchStartX.current || !isFullScreen || !showButtons) return;
+        touchEndX.current = e.targetTouches[0].clientX;
+    };
+    const handleTouchEnd = (e: React.TouchEvent) => {
+        if (!touchStartX.current || touchEndX.current === null || !isFullScreen || !showButtons) return;
+        const diffX = touchStartX.current - touchEndX.current;
+        if (Math.abs(diffX) > swipeThreshold) { if (diffX > 0) { nextMedia(); } else { prevMedia(); } }
+        touchStartX.current = null; touchEndX.current = null;
+    };
 
-  if (!validMediaUrls || validMediaUrls.length === 0) {
-    return <div className="w-full h-full aspect-square bg-gray-300 dark:bg-gray-700 flex items-center justify-center text-muted-foreground">Media Error</div>;
-  }
+    // --- Effects ---
+    // Reset index when media changes
+    useEffect(() => { setCurrentMediaIndex(0); /* setIsHovered(false); */ }, [mediaUrls]);
 
-  if (isUnplayableVideoFormat && !isFullScreen) {
+    // Keyboard navigation effect
+    useEffect(() => {
+      if (!isFullScreen || !showButtons) return;
+      const handleKeyDown = (event: KeyboardEvent) => {
+          if (event.key === 'ArrowRight') { nextMedia(); }
+          else if (event.key === 'ArrowLeft') { prevMedia(); }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => { window.removeEventListener('keydown', handleKeyDown); };
+    }, [isFullScreen, showButtons, nextMedia, prevMedia]);
+
+
+    // --- Render Logic ---
+    // No Media Placeholder
+    if (!validMediaUrls || validMediaUrls.length === 0) {
+      return <div className="w-full h-full aspect-square bg-gray-300 dark:bg-gray-700 flex items-center justify-center text-muted-foreground">Media Error</div>;
+    }
+
+    // Unplayable Placeholder (Grid View Only)
+    if (isUnplayableVideoFormat && !isFullScreen) {
       return (
           <div className="relative w-full h-full flex flex-col items-center justify-center bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 p-2 text-center overflow-hidden">
               {currentMediaUrl && ( <img src={currentMediaUrl} alt={title + " (Preview)"} className="absolute inset-0 w-full h-full object-cover opacity-10 dark:opacity-5 blur-[2px]" loading="lazy" /> )}
               <div className="relative z-10 flex flex-col items-center">
                    <Video className="w-6 h-6 mb-1 opacity-40" />
+                   <p className="text-xs font-semibold leading-tight line-clamp-2" title={title}> {/* Added line-clamp and title attribute */}
+                         {title}
+                     </p>
                    <p className="text-xs font-medium leading-tight">Video format not supported</p>
                    <a href={`https://www.reddit.com/r/${subreddit}/comments/${postId}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="mt-1 text-xs underline text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"> View on Reddit </a>
               </div>
           </div>
       );
-  }
+    }
 
-  return (
-    <div
-      className="relative group w-full h-full bg-black select-none"
-      onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}
-      onTouchStart={isFullScreen ? handleTouchStart : undefined}
-      onTouchMove={isFullScreen ? handleTouchMove : undefined}
-      onTouchEnd={isFullScreen ? handleTouchEnd : undefined}
-      ref={containerRef}
-    >
-      {isFullScreen && (
-          <DialogClose asChild>
-            <Button variant="ghost" size="icon" aria-label="Close dialog" className="absolute top-2 right-2 z-50 rounded-full h-8 w-8 bg-black/40 text-white hover:bg-black/60 active:scale-90">
-                <X className="h-4 w-4" />
-            </Button>
-          </DialogClose>
-      )}
+    // Main Render (Playable Content or Fullscreen)
+    return (
+        <div
+            className="relative group w-full h-full bg-black select-none" // Keep relative
+            onTouchStart={isFullScreen ? handleTouchStart : undefined}
+            onTouchMove={isFullScreen ? handleTouchMove : undefined}
+            onTouchEnd={isFullScreen ? handleTouchEnd : undefined}
+            ref={containerRef}
+        >
+            {/* === Top Control Bar (Rendered only when fullscreen) === */}
+            {isFullScreen && (
+                <div className="absolute top-0 left-0 right-0 z-40 p-2 bg-gradient-to-b from-black/60 via-black/40 to-transparent flex justify-between items-center">
+                    {/* Left side (can be empty or add title/info later) */}
+                    <div className="w-8 h-8"> {/* Placeholder to balance flex, match button size */} </div>
 
-      {showButtons && (
-        <>
-          <button onClick={prevMedia} aria-label="Previous Media" className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full z-30 transition-opacity duration-300 opacity-0 group-hover:opacity-100 focus:opacity-100 active:scale-90"> <ChevronLeft size={24} /> </button>
-          <button onClick={nextMedia} aria-label="Next Media" className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full z-30 transition-opacity duration-300 opacity-0 group-hover:opacity-100 focus:opacity-100 active:scale-90"> <ChevronRight size={24}/> </button>
-          <div className="absolute bottom-3 left-0 right-0 flex justify-center space-x-1.5 z-20 pointer-events-none">
-            {validMediaUrls.map((_, index) => ( <span key={index} className={cn( 'h-2 w-2 rounded-full transition-all duration-300', index === currentMediaIndex ? 'bg-white scale-110' : 'bg-gray-400 opacity-50 scale-90' )} /> ))}
-          </div>
-        </>
-      )}
+                    {/* Right side - Close Button */}
+                    <DialogClose asChild>
+                        <Button
+                           variant="ghost" size="icon" aria-label="Close dialog"
+                           // Styling for button in bar
+                           className="rounded-full h-8 w-8 text-white hover:bg-white/20 active:scale-90 focus-visible:ring-1 focus-visible:ring-white focus-visible:ring-offset-0" // Added focus style
+                        >
+                           <X className="h-5 w-5" />
+                        </Button>
+                    </DialogClose>
+                </div>
+            )}
+            {/* === End Top Control Bar === */}
 
-      <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
-           {isUnplayableVideoFormat && isFullScreen ? (
-               <div className="relative w-full h-full flex flex-col items-center justify-center bg-gray-900 text-white p-4 text-center">
-                   {currentMediaUrl && ( <img src={currentMediaUrl} alt={title + " (Preview)"} className="max-w-full max-h-[70vh] object-contain mb-4"/> )}
-                   <Video className="w-10 h-10 mb-2 opacity-60" />
-                   <p className="text-base font-semibold mb-2">Video format not supported in this app.</p>
-                   <a href={`https://www.reddit.com/r/${subreddit}/comments/${postId}`} target="_blank" rel="noopener noreferrer" className="text-base underline text-blue-400 hover:text-blue-300"> View Original Post on Reddit </a>
-               </div>
-           ) : isVideo ? (
-              <video key={`${currentMediaUrl}-${currentMediaIndex}`} src={currentMediaUrl} className={cn("object-contain block", isFullScreen ? 'max-h-[90vh] max-w-[95vw]' : 'h-auto w-full')} controls={isFullScreen} muted={!isFullScreen} playsInline autoPlay={isFullScreen} loop />
-           ) : (
-              <img key={`${currentMediaUrl}-${currentMediaIndex}`} src={currentMediaUrl} alt={title} className={cn("object-cover block w-full", isFullScreen ? 'max-h-[90vh] max-w-[95vw] object-contain' : 'h-auto')} loading="lazy" />
-           )}
 
-           {!isFullScreen && !isUnplayableVideoFormat && ( <div className="absolute inset-0 z-10 cursor-pointer" aria-hidden="true" /> )}
+            {/* Navigation Arrows & Dots (Ensure z-index < control bar) */}
+            {showButtons && (
+                <>
+                 <button onClick={prevMedia} aria-label="Previous Media" className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full z-30 transition-opacity duration-300 opacity-0 group-hover:opacity-100 focus:opacity-100 active:scale-90"> <ChevronLeft size={24}/> </button>
+                 <button onClick={nextMedia} aria-label="Next Media" className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full z-30 transition-opacity duration-300 opacity-0 group-hover:opacity-100 focus:opacity-100 active:scale-90"> <ChevronRight size={24}/> </button>
+                 <div className="absolute bottom-3 left-0 right-0 flex justify-center space-x-1.5 z-20 pointer-events-none">
+                    {validMediaUrls.map((_, index) => ( <span key={index} className={cn( 'h-2 w-2 rounded-full transition-all duration-300', index === currentMediaIndex ? 'bg-white scale-110' : 'bg-gray-400 opacity-50 scale-90' )} /> ))}
+                 </div>
+                </>
+            )}
 
-           {isFullScreen && !isUnplayableVideoFormat && (
-             <div className={cn( "absolute left-0 w-full bg-gradient-to-t from-black/70 via-black/40 to-transparent text-white transition-opacity duration-300 p-4 z-20 pointer-events-none", overlayPosition === 'top' ? 'top-0 bg-gradient-to-b' : 'bottom-0 bg-gradient-to-t', isHovered ? 'opacity-100' : 'opacity-0' )} >
-               <DialogTitle className="text-base md:text-lg font-semibold line-clamp-2">
-                  {title} (From: <a href={`https://www.reddit.com/r/${subreddit}/comments/${postId}`} target="_blank" rel="noopener noreferrer" className="underline pointer-events-auto" onClick={(e) => e.stopPropagation()} > r/{subreddit} </a>)
-               </DialogTitle>
-             </div>
-           )}
-      </div>
-    </div>
-  );
+            {/* Media Content Container */}
+            <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+                {/* Render unplayable placeholder OR video/image */}
+                 {isUnplayableVideoFormat && isFullScreen ? (
+                     <div className="relative w-full h-full flex flex-col items-center justify-center bg-gray-900 text-white p-4 text-center">
+                         {currentMediaUrl && ( <img src={currentMediaUrl} alt={title + " (Preview)"} className="max-w-full max-h-[70vh] object-contain mb-4"/> )}
+                         <Video className="w-10 h-10 mb-2 opacity-60" />
+                         <p className="text-base font-semibold mb-2">Video format not supported in this app.</p>
+                         <a href={`https://www.reddit.com/r/${subreddit}/comments/${postId}`} target="_blank" rel="noopener noreferrer" className="text-base underline text-blue-400 hover:text-blue-300"> View Original Post on Reddit </a>
+                     </div>
+                 ) : isVideo ? (
+                    <video key={`${currentMediaUrl}-${currentMediaIndex}`} src={currentMediaUrl} className={cn("object-contain block", isFullScreen ? 'max-h-[90vh] max-w-[95vw]' : 'h-auto w-full')} controls={isFullScreen} muted={!isFullScreen} playsInline autoPlay={isFullScreen} loop />
+                 ) : (
+                    <img key={`${currentMediaUrl}-${currentMediaIndex}`} src={currentMediaUrl} alt={title} className={cn("object-cover block w-full", isFullScreen ? 'max-h-[90vh] max-w-[95vw] object-contain' : 'h-auto')} loading="lazy" />
+                 )}
+
+                 {/* Tap overlay for grid view */}
+                 {!isFullScreen && !isUnplayableVideoFormat && ( <div className="absolute inset-0 z-10 cursor-pointer" aria-hidden="true" /> )}
+
+                 {/* Fullscreen Title Overlay - NOW AT THE BOTTOM */}
+                 {isFullScreen && !isUnplayableVideoFormat && (
+                     <div
+                        // Placed at bottom, always visible, z-index 30 so above dots (z-20) but below top bar (z-40)
+                        className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/70 via-black/40 to-transparent text-white p-4 z-30 pointer-events-none"
+                      >
+                         {/* Use standard DialogTitle for consistency or just a p tag */}
+                         <p className="text-base md:text-lg font-semibold">
+                             {title} (From: <a href={`https://www.reddit.com/r/${subreddit}/comments/${postId}`} target="_blank" rel="noopener noreferrer" className="underline pointer-events-auto" onClick={(e) => e.stopPropagation()} > r/{subreddit} </a>)
+                         </p>
+                     </div>
+                 )}
+            </div>
+        </div>
+    );
 });
 MediaCarousel.displayName = 'MediaCarousel';
-// *** END FILLED FROM PREVIOUS ***
+// *** END NEW MediaCarousel IMPLEMENTATION ***
 
 
-// --- Interleaving Helper (Kept as is from previous version) ---
-// *** FILLED FROM PREVIOUS ***
+// --- Interleaving Helper ---
 const interleavePosts = (groupedPosts: RedditPost[][]): RedditPost[] => {
     if (!groupedPosts || groupedPosts.length === 0) return [];
     const interleaved: RedditPost[] = [];
@@ -252,7 +249,6 @@ const interleavePosts = (groupedPosts: RedditPost[][]): RedditPost[] => {
     }
     return interleaved;
 };
-// *** END FILLED FROM PREVIOUS ***
 
 
 // --- Define Saved Lists Type ---
@@ -261,8 +257,7 @@ type SavedLists = { [name: string]: string };
 
 // --- Home Page Component ---
 export default function Home() {
-  // --- State Variables (Filled from previous) ---
-  // *** FILLED FROM PREVIOUS ***
+  // --- State Variables ---
   const [subredditInput, setSubredditInput] = useState<string>('');
   const [posts, setPosts] = useState<RedditPost[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -271,35 +266,25 @@ export default function Home() {
   const [afterTokens, setAfterTokens] = useState<{ [subreddit: string]: string | null }>({});
   const [hasMore, setHasMore] = useState(true);
   const [fetchInitiated, setFetchInitiated] = useState(false);
-  const [favorites, setFavorites] = useState<string[]>([]); // Kept for potential future use
+  const [favorites, setFavorites] = useState<string[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [sortType, setSortType] = useState<SortType>('hot');
   const [timeFrame, setTimeFrame] = useState<TimeFrame>('day');
   const [savedLists, setSavedLists] = useState<SavedLists>({});
   const [selectedListName, setSelectedListName] = useState<string>("");
   const [isControlsOpen, setIsControlsOpen] = useState(false);
-  // *** END FILLED FROM PREVIOUS ***
 
   const { toast } = useToast();
 
-  // *** Initialize Cache using useRef ***
+  // --- Cache ---
   const apiCache = useRef(new Map<CacheKey, CachedRedditResponse>()).current;
-
-  // Function to generate a unique key for caching
-  const generateCacheKey = (
-      sub: string,
-      sort: SortType,
-      time?: TimeFrame,
-      after?: string | null
-  ): CacheKey => {
-      // Ensure timeframe is always part of the key when sort is 'top'
-      const timeKey = sort === 'top' ? (time || 'all') : 'hot'; // Use 'hot' placeholder if sort isn't top
-      const afterKey = after || 'initial'; // Use 'initial' for the first page
+  const generateCacheKey = ( sub: string, sort: SortType, time?: TimeFrame, after?: string | null ): CacheKey => {
+      const timeKey = sort === 'top' ? (time || 'all') : 'hot';
+      const afterKey = after || 'initial';
       return `${sub}::${sort}::${timeKey}::${afterKey}`;
   };
 
-  // --- Load/Save Saved Lists (Filled from previous) ---
-  // *** FILLED FROM PREVIOUS ***
+  // --- Load/Save Saved Lists ---
   useEffect(() => {
     try {
         const storedLists = localStorage.getItem(LOCAL_STORAGE_SAVED_LISTS_KEY);
@@ -318,11 +303,8 @@ export default function Home() {
          catch (err) { console.error("Failed to save lists:", err); toast({ variant: "destructive", title: "Storage Error" }); }
     } else { localStorage.removeItem(LOCAL_STORAGE_SAVED_LISTS_KEY); }
   }, [savedLists, toast]);
-  // *** END FILLED FROM PREVIOUS ***
 
-
-  // --- Infinite Scroll (Filled from previous) ---
-  // *** FILLED FROM PREVIOUS ***
+  // --- Infinite Scroll ---
   const observer = useRef<IntersectionObserver>();
   const loadMorePostsRef = useRef<() => Promise<void>>();
   const lastPostRef = useCallback(
@@ -334,10 +316,8 @@ export default function Home() {
       }, { threshold: 0.5 });
       if (node) observer.current.observe(node);
     }, [isLoading, hasMore, fetchInitiated] );
-  // *** END FILLED FROM PREVIOUS ***
 
-
-   // --- Data Fetching (Updated for Caching) ---
+   // --- Data Fetching (with Caching) ---
    const performFetch = useCallback(async (
       subredditsToFetch: string[],
       currentSortType: SortType,
@@ -354,35 +334,28 @@ export default function Home() {
 
     type SuccessfulFetchValue = { posts: RedditPost[]; after: string | null; sub: string; };
     let overallError: Error | null = null;
-    const fetchPromises: Promise<SuccessfulFetchValue>[] = []; // Store promises to run in parallel
-    const subOrderForResults: string[] = []; // Keep track of the original sub order
+    const fetchPromises: Promise<SuccessfulFetchValue>[] = [];
+    const subOrderForResults: string[] = [];
 
-    // Use Promise.allSettled, but check cache first
     for (const sub of subredditsToFetch) {
-        const afterParam = currentAfterTokens[sub] ?? undefined; // Correctly get 'after' for this specific sub
-        // Use the provided currentTimeFrame for the key generation
+        const afterParam = currentAfterTokens[sub] ?? undefined;
         const cacheKey = generateCacheKey(sub, currentSortType, currentSortType === 'top' ? currentTimeFrame : undefined, afterParam);
-        subOrderForResults.push(sub); // Store sub in the order promises are added
+        subOrderForResults.push(sub);
 
         if (apiCache.has(cacheKey)) {
-            // *** Cache Hit ***
             console.log(`%cCache HIT for key: ${cacheKey}`, 'color: green');
             const cachedData = apiCache.get(cacheKey)!;
-            // Add subreddit context back (it's not stored in the cache object itself)
-            // Ensure isUnplayableVideoFormat is present (might not be in older cache entries)
-             const postsWithMetadata = cachedData.posts.map(p => ({
+            const postsWithMetadata = cachedData.posts.map(p => ({
                 ...p,
                 subreddit: sub,
-                isUnplayableVideoFormat: p.isUnplayableVideoFormat ?? false // Add default if missing
+                isUnplayableVideoFormat: p.isUnplayableVideoFormat ?? false
             }));
-            // Wrap cached data in a resolved promise
             fetchPromises.push(Promise.resolve({
                 posts: postsWithMetadata,
                 after: cachedData.after,
                 sub: sub
             }));
         } else {
-            // *** Cache Miss - Fetch from API ***
             console.log(`%cCache MISS for key: ${cacheKey}`, 'color: orange');
             fetchPromises.push(
                 getPosts(sub, currentSortType, {
@@ -390,16 +363,9 @@ export default function Home() {
                     after: afterParam,
                     limit: POSTS_PER_LOAD
                 }).then(response => {
-                    // Store successful fetch in cache
-                    // The cached posts don't need the subreddit prop, it's added back on retrieval
-                    const dataToCache: CachedRedditResponse = {
-                         posts: response.posts, // Store raw posts from API
-                         after: response.after
-                     };
+                    const dataToCache: CachedRedditResponse = { posts: response.posts, after: response.after };
                     apiCache.set(cacheKey, dataToCache);
                     console.log(`%cStored in cache: ${cacheKey}`, 'color: blue');
-
-                    // Add subreddit context & ensure unplayable flag for processing
                     const postsWithMetadata = response.posts.map(p => ({
                         ...p,
                         subreddit: sub,
@@ -407,12 +373,10 @@ export default function Home() {
                     }));
                     return { posts: postsWithMetadata, after: response.after, sub: sub };
                 })
-                // Let Promise.allSettled handle rejections
             );
         }
     }
 
-    // Process results (cached or fetched)
     try {
         const results: PromiseSettledResult<SuccessfulFetchValue>[] = await Promise.allSettled(fetchPromises);
         const successfulResults: SuccessfulFetchValue[] = [];
@@ -420,52 +384,39 @@ export default function Home() {
         const updatedAfterTokens: { [subreddit: string]: string | null } = {};
 
         results.forEach((result, index) => {
-            // Use the tracked order to get the correct subreddit for this result
             const sub = subOrderForResults[index];
-
             if (result.status === 'fulfilled') {
                 successfulResults.push(result.value);
-                // Make sure we update the token for the correct sub
                 updatedAfterTokens[sub] = result.value.after;
             } else {
                 console.error(`Failed to fetch/process for r/${sub}:`, result.reason);
                 errors.push({ sub: sub, reason: result.reason });
-                // Preserve existing token if fetch failed for this sub
                 updatedAfterTokens[sub] = currentAfterTokens[sub] ?? null;
                 if (!overallError) { overallError = result.reason instanceof Error ? result.reason : new Error(`Fetch failed for r/${sub}: ${String(result.reason)}`); }
             }
         });
 
-       if (overallError && successfulResults.length === 0) throw new Error(`All subreddit fetches failed. First error`);
+       if (overallError && successfulResults.length === 0) throw new Error(`All subreddit fetches failed. First error:`);
        else if (overallError) toast({ variant: "destructive", title: "Fetch Warning", description: `Could not load some subreddits. Check console.`});
 
-      // Group posts based on the successful results (order should align with subOrderForResults initially)
       const groupedPosts = successfulResults.map(res => res.posts);
       const anyHasMore = Object.values(updatedAfterTokens).some(token => token !== null);
-
-      // IMPORTANT: Ensure the final tokens object merges correctly, preserving tokens for subs not in the current fetch batch
       const finalUpdatedTokens = {...currentAfterTokens, ...updatedAfterTokens};
 
       return { groupedPosts, updatedAfterTokens: finalUpdatedTokens, anyHasMore };
 
     } catch (e) { if (e instanceof Error) { throw e; } else { throw new Error('An unexpected error occurred during the fetch process.'); } }
-   }, [apiCache, toast]); // Added apiCache, toast dependencies
+   }, [apiCache, toast, generateCacheKey]); // Added generateCacheKey dependency
 
    const fetchInitialPosts = useCallback(async () => {
      let subsToUse = parseSubreddits(subredditInput);
-     // Removed favorites logic from here as it wasn't used in previous fetch logic
      if (subsToUse.length === 0) {
         setError("Please enter at least one valid subreddit name.");
-        setPosts([]);
-        setFetchInitiated(false);
-        setHasMore(false);
-        return;
+        setPosts([]); setFetchInitiated(false); setHasMore(false); return;
      }
 
-     // *** Clear cache only for the specific initial request keys ***
      console.log("Clearing initial cache for relevant keys...");
      subsToUse.forEach(sub => {
-         // Use undefined for 'after' to match initial load key generation
          const initialCacheKey = generateCacheKey(sub, sortType, sortType === 'top' ? timeFrame : undefined, undefined);
          if (apiCache.has(initialCacheKey)) {
              apiCache.delete(initialCacheKey);
@@ -475,73 +426,49 @@ export default function Home() {
 
      setIsLoading(true); setError(null); setPosts([]); setAfterTokens({}); setHasMore(true); setFetchInitiated(true);
      try {
-         // Pass empty tokens map {} for initial fetch
          const { groupedPosts, updatedAfterTokens, anyHasMore } = await performFetch( subsToUse, sortType, timeFrame, {} );
          const interleavedInitialPosts = interleavePosts(groupedPosts);
-         setPosts(interleavedInitialPosts);
-         setAfterTokens(updatedAfterTokens); // Set the complete tokens map from the fetch result
-         setHasMore(anyHasMore);
+         setPosts(interleavedInitialPosts); setAfterTokens(updatedAfterTokens); setHasMore(anyHasMore);
           if (interleavedInitialPosts.length === 0 && anyHasMore === false && !error) {
                if (subsToUse.every(isValidSubreddit)) {
                   toast({ description: `No posts found for "${subsToUse.join(', ')}" with the current filters.` });
-               } else {
-                   toast({ description: "No posts found." });
-               }
+               } else { toast({ description: "No posts found." }); }
           }
      } catch (e) {
          if (e instanceof Error) { setError(`Fetch error: ${e.message}`); }
          else { setError('An unknown error occurred during the initial fetch.'); }
-         setHasMore(false);
-         setPosts([]);
+         setHasMore(false); setPosts([]);
      } finally { setIsLoading(false); }
-   }, [subredditInput, /* favorites, */ sortType, timeFrame, toast, performFetch, apiCache]); // Removed 'favorites'
+   }, [subredditInput, sortType, timeFrame, toast, performFetch, apiCache, generateCacheKey]); // Added generateCacheKey
 
    const loadMorePosts = useCallback(async () => {
      if (isLoading || !hasMore || !fetchInitiated) return;
-
      let subsToUse = parseSubreddits(subredditInput);
-     // Removed favorites logic
      if (subsToUse.length === 0) { setHasMore(false); return; }
-
-     // Filter based on *current* afterTokens state for *these* subreddits
      const subsWithPotentialMore = subsToUse.filter(sub => afterTokens[sub] !== null && afterTokens[sub] !== undefined);
+     if (subsWithPotentialMore.length === 0) { setHasMore(false); return; }
 
-     if (subsWithPotentialMore.length === 0) {
-         console.log("No more posts to load for the current subreddits.");
-         setHasMore(false);
-         return;
-     }
-
-     setIsLoading(true); setError(null); // Clear previous errors when attempting to load more
+     setIsLoading(true); setError(null);
      try {
-          // Fetch normally, performFetch will check cache or fetch for relevant 'after' keys
-          // Pass the *current* full afterTokens map
           const { groupedPosts, updatedAfterTokens, anyHasMore } = await performFetch( subsWithPotentialMore, sortType, timeFrame, afterTokens );
          const interleavedNewPosts = interleavePosts(groupedPosts);
          setPosts(prevPosts => [...prevPosts, ...interleavedNewPosts]);
-         // Update the state with the latest tokens map from the fetch result
-         setAfterTokens(updatedAfterTokens);
-         setHasMore(anyHasMore);
+         setAfterTokens(updatedAfterTokens); setHasMore(anyHasMore);
      } catch (e) {
          if (e instanceof Error) { setError(`Load more error: ${e.message}`); }
          else { setError('An unknown error occurred while loading more posts.'); }
-         setHasMore(false); // Stop trying if error occurs
+         setHasMore(false);
      } finally { setIsLoading(false); }
-   }, [isLoading, hasMore, fetchInitiated, afterTokens, subredditInput, /* favorites, */ sortType, timeFrame, toast, performFetch, apiCache]); // Removed 'favorites'
+   }, [isLoading, hasMore, fetchInitiated, afterTokens, subredditInput, sortType, timeFrame, toast, performFetch, apiCache]); // Removed generateCacheKey (not directly used here)
 
-   // Assign loadMorePosts to the ref whenever it changes
    useEffect(() => { loadMorePostsRef.current = loadMorePosts; }, [loadMorePosts]);
 
 
-  // --- Event Handlers (Filled from previous) ---
-  // *** FILLED FROM PREVIOUS ***
+  // --- Event Handlers ---
   const handleThumbnailClick = useCallback((post: RedditPost) => { setSelectedPost(post); setIsDialogOpen(true); }, []);
   const handleDialogClose = useCallback(() => { setIsDialogOpen(false); setTimeout(() => { setSelectedPost(null); }, 300); }, []);
-  // *** END FILLED FROM PREVIOUS ***
 
-
-  // --- Saved Lists Handlers (Filled from previous) ---
-  // *** FILLED FROM PREVIOUS ***
+  // --- Saved Lists Handlers ---
    const handleSaveList = useCallback(() => {
         const currentInput = subredditInput.trim(); if (!currentInput) { toast({ variant: "destructive", description: "Input field is empty." }); return; }
         const listName = window.prompt("Enter a name for this list:", ""); if (listName === null) return;
@@ -562,42 +489,32 @@ export default function Home() {
             setSelectedListName(""); toast({ description: `List "${selectedListName}" deleted.` });
         }
    }, [selectedListName, toast]);
-   // *** END FILLED FROM PREVIOUS ***
 
-
-   // --- Masonry Breakpoint Configuration (Filled from previous) ---
-   // *** FILLED FROM PREVIOUS ***
+   // --- Masonry Breakpoint Configuration ---
    const breakpointColumnsObj = { default: 6, 1280: 5, 1024: 4, 768: 3 };
-   // *** END FILLED FROM PREVIOUS ***
-
 
    // --- Render ---
-   // *** FILLED FROM PREVIOUS (JSX structure) ***
    const savedListNames = Object.keys(savedLists);
 
   return (
     <div className="container mx-auto px-2 py-4 sm:px-4 sm:py-6 min-h-screen flex flex-col">
+      {/* Header */}
       <header className="mb-6 flex-shrink-0">
-        <h1 className="text-3xl sm:text-4xl font-bold text-center mb-4 sm:mb-6">Sub Gallery</h1>
         <div className="max-w-xl mx-auto space-y-3">
+            {/* Input and Fetch Button */}
             <div className="flex flex-col sm:flex-row items-stretch gap-2">
                  <Input
-                    type="text"
-                    aria-label="Enter subreddit names separated by commas"
-                    placeholder="Enter subreddits..."
-                    value={subredditInput}
+                    type="text" aria-label="Enter subreddit names separated by commas"
+                    placeholder="Enter subreddits..." value={subredditInput}
                     onChange={(e) => setSubredditInput(e.target.value)}
                     className="flex-grow text-base"
                     onKeyDown={(e) => { if (e.key === 'Enter' && !isLoading) fetchInitialPosts(); }}
                  />
-                 <Button
-                    onClick={fetchInitialPosts}
-                    disabled={isLoading}
-                    className="w-full sm:w-auto flex-shrink-0 active:scale-95 transition-transform"
-                 >
+                 <Button onClick={fetchInitialPosts} disabled={isLoading} className="w-full sm:w-auto flex-shrink-0 active:scale-95 transition-transform">
                      {isLoading && posts.length === 0 ? "Fetching..." : "Fetch"}
                  </Button>
              </div>
+             {/* Collapsible Controls */}
             <Collapsible open={isControlsOpen} onOpenChange={setIsControlsOpen}>
                  <div className="flex justify-center mb-2">
                      <CollapsibleTrigger asChild>
@@ -607,6 +524,7 @@ export default function Home() {
                      </CollapsibleTrigger>
                  </div>
                 <CollapsibleContent className="space-y-3 overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
+                    {/* Save/Load/Delete List Controls */}
                     <div className="flex flex-col sm:flex-row items-stretch gap-2 pt-2">
                         <Select value={selectedListName} onValueChange={handleLoadList} disabled={isLoading}>
                             <SelectTrigger className="flex-grow" aria-label="Load saved list"><SelectValue placeholder="Load saved list..." /></SelectTrigger>
@@ -618,6 +536,7 @@ export default function Home() {
                         <Button onClick={handleSaveList} variant="outline" size="icon" aria-label="Save current list" title="Save current list" className="active:scale-95 transition-transform" disabled={isLoading || !subredditInput.trim()}><Save className="h-4 w-4" /></Button>
                         <Button onClick={handleDeleteList} variant="destructive" size="icon" aria-label="Delete selected list" title="Delete selected list" disabled={!selectedListName || isLoading} className="active:scale-95 transition-transform"><Trash2 className="h-4 w-4" /></Button>
                     </div>
+                    {/* Sort/Timeframe Controls */}
                     <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-center justify-center pt-2">
                         <RadioGroup defaultValue="hot" className="flex gap-4" value={sortType} onValueChange={(value) => { if(!isLoading) setSortType(value as SortType)}} aria-label="Sort posts by" >
                             <Label htmlFor="sort-hot" className={cn("flex items-center space-x-2 p-1 rounded", isLoading ? "text-muted-foreground cursor-not-allowed" : "cursor-pointer hover:bg-accent")}> <RadioGroupItem value="hot" id="sort-hot" disabled={isLoading}/> <span>Hot</span> </Label>
@@ -628,23 +547,28 @@ export default function Home() {
                 </CollapsibleContent>
             </Collapsible>
          </div>
+         {/* Error Message */}
          {error && <p className="text-red-500 mt-2 text-center text-sm">{error}</p>}
       </header>
 
+      {/* Main Content Area */}
       <main className="flex-grow mt-2">
+        {/* Initial Loading Skeletons */}
         {isLoading && posts.length === 0 && !error && (
             <Masonry breakpointCols={breakpointColumnsObj} className="my-masonry-grid flex gap-1.5" columnClassName="my-masonry-grid_column">
                  {Array.from({ length: 18 }).map((_, index) => ( <Skeleton key={`skeleton-${index}`} className="h-64 w-full mb-1.5" /> ))}
             </Masonry>
         )}
+        {/* No Posts Message */}
         {fetchInitiated && posts.length === 0 && !isLoading && !error && ( <p className="text-center text-muted-foreground mt-10">No posts found.</p> )}
+        {/* Posts Grid */}
         {posts.length > 0 && (
           <Masonry breakpointCols={breakpointColumnsObj} className="my-masonry-grid flex gap-1.5" columnClassName="my-masonry-grid_column">
             {posts.map((post) => {
                 const firstUrl=post?.mediaUrls?.[0];
                 const isVideoPost=firstUrl&&firstUrl.endsWith('.mp4');
                 const isGalleryPost=post?.mediaUrls?.length>1;
-                const isUnplayable = post.isUnplayableVideoFormat ?? false; // Ensure default
+                const isUnplayable = post.isUnplayableVideoFormat ?? false;
                 return (
                 <div key={`${post.subreddit}-${post.postId}`} ref={posts[posts.length-1]===post?lastPostRef:null} className="mb-1.5">
                  <Card onClick={()=> !isUnplayable && handleThumbnailClick(post)}
@@ -653,6 +577,7 @@ export default function Home() {
                             !isUnplayable && "hover:shadow-lg hover:scale-[1.02] active:scale-95 cursor-pointer",
                             isUnplayable && "cursor-default"
                        )}>
+                     {/* Indicators */}
                      {(isVideoPost || isGalleryPost || isUnplayable) && (
                         <div className="absolute top-1 right-1 z-20 p-1 rounded-full bg-black/40 text-white transition-opacity opacity-70 group-hover:opacity-100">
                             {isUnplayable ? <Video className="h-3 w-3 opacity-70"/> :
@@ -660,45 +585,48 @@ export default function Home() {
                              <GalleryIcon className="h-3 w-3"/>}
                         </div>
                      )}
+                     {/* Grid Item Media Carousel */}
                      <MediaCarousel
-                        mediaUrls={post.mediaUrls}
-                        title={post.title}
-                        subreddit={post.subreddit}
-                        postId={post.postId}
-                        isUnplayableVideoFormat={isUnplayable}
+                        mediaUrls={post.mediaUrls} title={post.title} subreddit={post.subreddit}
+                        postId={post.postId} isUnplayableVideoFormat={isUnplayable}
                      />
                  </Card>
                 </div>);
             })}
            </Masonry>
         )}
+        {/* Loading More Indicator */}
         {isLoading && posts.length > 0 && ( <div className="flex justify-center items-center gap-2 text-center mt-6 p-4 text-muted-foreground"> <Loader2 className="h-4 w-4 animate-spin" /> Loading more... </div> )}
+        {/* End Reached Message */}
         {!hasMore && fetchInitiated && posts.length > 0 && ( <p className="text-center mt-6 p-4 text-muted-foreground">You've reached the end!</p> )}
       </main>
 
+      {/* Fullscreen Dialog */}
+      {/* *** DIALOG UPDATED: Removed DialogClose button from here *** */}
       <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
         <DialogContent className="max-w-none w-[95vw] h-[95vh] p-0 bg-transparent border-none overflow-hidden flex items-center justify-center">
+           {/* Inner wrapper for background, padding, backdrop */}
            <div className="relative w-full h-full flex items-center justify-center bg-black/90 backdrop-blur-sm p-1 sm:p-2">
               <DialogTitle className="sr-only"> Expanded view: {selectedPost?.title || 'Reddit Post'} </DialogTitle>
               <DialogDescription className="sr-only"> Expanded view of Reddit post: {selectedPost?.title || 'Content'}... </DialogDescription>
               {selectedPost ? (
                  <MediaCarousel
-                    mediaUrls={selectedPost.mediaUrls}
-                    title={selectedPost.title}
-                    subreddit={selectedPost.subreddit}
-                    postId={selectedPost.postId}
-                    isFullScreen={true}
+                    mediaUrls={selectedPost.mediaUrls} title={selectedPost.title}
+                    subreddit={selectedPost.subreddit} postId={selectedPost.postId}
+                    isFullScreen={true} // Explicitly set isFullScreen
                     isUnplayableVideoFormat={selectedPost.isUnplayableVideoFormat ?? false}
                  />
               ) : ( <div className="text-white text-xl">Loading content...</div> )}
+              {/* NO DialogClose button here anymore - it's inside MediaCarousel */}
            </div>
         </DialogContent>
       </Dialog>
+      {/* *** END DIALOG UPDATE *** */}
 
+      {/* Footer */}
       <footer className="mt-16 md:mt-24 text-center text-sm text-muted-foreground flex-shrink-0 pb-6">
         <p> Built with ❤️ </p>
       </footer>
     </div>
    );
-   // *** END FILLED FROM PREVIOUS (JSX structure) ***
 }
