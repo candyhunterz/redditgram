@@ -2,15 +2,14 @@
 "use client";
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+// *** FILLED IMPORTS ***
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-// Import updated service function and types
 import { RedditPost, getPosts, SortType, TimeFrame } from "@/services/reddit";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-// Added/updated icons: Filter, Loader2
 import { ChevronLeft, ChevronRight, Trash2, Save, X, Video, Copy as GalleryIcon, Filter, Loader2 } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton"; // Added Skeleton
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -19,7 +18,6 @@ import {
   DialogDescription,
   DialogClose
 } from "@/components/ui/dialog";
-// Import UI components for sorting & save/load
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import {
@@ -31,18 +29,17 @@ import {
   SelectGroup,
   SelectLabel,
 } from "@/components/ui/select";
-// Import Collapsible components
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-// *** Import Masonry Component ***
 import Masonry from 'react-masonry-css';
+// *** END FILLED IMPORTS ***
 
 
-// --- Helper Functions ---
-
+// --- Helper Functions & Constants ---
+// *** FILLED FROM PREVIOUS ***
 const isValidSubreddit = (subreddit: string): boolean => {
   // Basic validation, allows alphanumeric and underscore, non-empty
   return /^[a-zA-Z0-9_]+$/.test(subreddit) && subreddit.length > 0;
@@ -53,17 +50,30 @@ const parseSubreddits = (input: string): string[] => {
   return input.split(',').map(s => s.trim()).filter(s => s !== '');
 };
 
-const POSTS_PER_LOAD = 20; // Number of posts to fetch *per subreddit* per request
-const LOCAL_STORAGE_SAVED_LISTS_KEY = "savedSubredditLists"; // Key for localStorage
+const POSTS_PER_LOAD = 20;
+const LOCAL_STORAGE_SAVED_LISTS_KEY = "savedSubredditLists";
+// *** END FILLED FROM PREVIOUS ***
 
-// --- MediaCarousel Component (Memoized, with Tap Overlay Fix, Keyboard Nav, Enhanced Dots, Swipe Gestures) ---
+
+// --- Define Cache Types ---
+// Define the structure of the data we'll cache
+type CachedRedditResponse = {
+    posts: RedditPost[];
+    after: string | null;
+};
+// Define the structure of the cache Map's key
+type CacheKey = string;
+
+
+// --- MediaCarousel Component (Kept as is from previous version) ---
+// *** FILLED FROM PREVIOUS ***
 interface MediaCarouselProps {
   mediaUrls: string[];
   title: string;
   subreddit: string;
   postId: string;
   isFullScreen?: boolean;
-  isUnplayableVideoFormat?: boolean; // Added prop
+  isUnplayableVideoFormat?: boolean;
 }
 
 const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
@@ -72,20 +82,18 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
     subreddit,
     postId,
     isFullScreen = false,
-    isUnplayableVideoFormat = false // Receive prop
+    isUnplayableVideoFormat = false
 }) => {
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
   const [overlayPosition, setOverlayPosition] = useState<'top' | 'bottom'>('top');
 
-  // Refs for swipe detection
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
-  const swipeThreshold = 50; // Minimum pixels to trigger swipe
+  const swipeThreshold = 50;
 
   const validMediaUrls = Array.isArray(mediaUrls) ? mediaUrls : [];
-  // Show buttons only if multiple media AND not the unplayable placeholder
   const showButtons = validMediaUrls.length > 1 && !isUnplayableVideoFormat;
 
   const nextMedia = useCallback(() => {
@@ -100,14 +108,14 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
      }
   }, [validMediaUrls.length]);
 
-  const currentMediaUrl = validMediaUrls[currentMediaIndex]; // Might be preview image URL
-  const isVideo = currentMediaUrl?.endsWith('.mp4') && !isUnplayableVideoFormat; // Ensure it's not the placeholder preview
+  const currentMediaUrl = validMediaUrls[currentMediaIndex];
+  const isVideo = currentMediaUrl?.endsWith('.mp4') && !isUnplayableVideoFormat;
 
   const handleMouseEnter = useCallback(() => { if (isFullScreen) setIsHovered(true); }, [isFullScreen]);
   const handleMouseLeave = useCallback(() => { if (isFullScreen) setIsHovered(false); }, [isFullScreen]);
 
   const updateOverlayPosition = useCallback(() => {
-    if (containerRef.current && currentMediaUrl && !isVideo && !isUnplayableVideoFormat) { // Don't run for placeholder/video
+    if (containerRef.current && currentMediaUrl && !isVideo && !isUnplayableVideoFormat) {
       const img = new Image();
       img.src = currentMediaUrl;
       img.onload = () => {
@@ -117,7 +125,7 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
         } else { setOverlayPosition('top'); }
       };
       img.onerror = () => { setOverlayPosition('top'); }
-    } else { setOverlayPosition('top'); } // Default for video/placeholder
+    } else { setOverlayPosition('top'); }
   }, [currentMediaUrl, isVideo, isUnplayableVideoFormat]);
 
   useEffect(() => {
@@ -125,13 +133,11 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
     setIsHovered(false);
   }, [isFullScreen, updateOverlayPosition]);
 
-  // Reset index only when the array instance changes (new post selected)
   useEffect(() => {
      setCurrentMediaIndex(0);
      setIsHovered(false);
-  }, [mediaUrls]); // Depends on the actual prop array
+  }, [mediaUrls]);
 
-  // --- Keyboard Navigation for Dialog ---
   useEffect(() => {
     if (!isFullScreen || !showButtons) return;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -142,7 +148,6 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
     return () => { window.removeEventListener('keydown', handleKeyDown); };
   }, [isFullScreen, showButtons, nextMedia, prevMedia]);
 
-  // --- Swipe Event Handlers ---
   const handleTouchStart = (e: React.TouchEvent) => {
       if (!isFullScreen || !showButtons) return;
       touchEndX.current = null; touchStartX.current = e.targetTouches[0].clientX;
@@ -158,21 +163,16 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
       touchStartX.current = null; touchEndX.current = null;
   };
 
-  // --- Render Logic ---
   if (!validMediaUrls || validMediaUrls.length === 0) {
     return <div className="w-full h-full aspect-square bg-gray-300 dark:bg-gray-700 flex items-center justify-center text-muted-foreground">Media Error</div>;
   }
 
-  // Placeholder rendering for unplayable videos (Grid View Only - handled differently for fullscreen below)
   if (isUnplayableVideoFormat && !isFullScreen) {
       return (
           <div className="relative w-full h-full flex flex-col items-center justify-center bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 p-2 text-center overflow-hidden">
               {currentMediaUrl && ( <img src={currentMediaUrl} alt={title + " (Preview)"} className="absolute inset-0 w-full h-full object-cover opacity-10 dark:opacity-5 blur-[2px]" loading="lazy" /> )}
-              <div className="relative z-10 flex flex-col items-center space-y-1">
+              <div className="relative z-10 flex flex-col items-center">
                    <Video className="w-6 h-6 mb-1 opacity-40" />
-                   <p className="text-xs font-semibold leading-tight line-clamp-2" title={title}> {/* Added line-clamp and title attribute */}
-                         {title}
-                     </p>
                    <p className="text-xs font-medium leading-tight">Video format not supported</p>
                    <a href={`https://www.reddit.com/r/${subreddit}/comments/${postId}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="mt-1 text-xs underline text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"> View on Reddit </a>
               </div>
@@ -180,7 +180,6 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
       );
   }
 
-  // Main Render for Playable Content or Fullscreen
   return (
     <div
       className="relative group w-full h-full bg-black select-none"
@@ -190,7 +189,6 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
       onTouchEnd={isFullScreen ? handleTouchEnd : undefined}
       ref={containerRef}
     >
-      {/* Custom Close Button (Rendered only when fullscreen) */}
       {isFullScreen && (
           <DialogClose asChild>
             <Button variant="ghost" size="icon" aria-label="Close dialog" className="absolute top-2 right-2 z-50 rounded-full h-8 w-8 bg-black/40 text-white hover:bg-black/60 active:scale-90">
@@ -199,7 +197,6 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
           </DialogClose>
       )}
 
-      {/* Navigation Arrows & Dots (Rendered only if multiple media and NOT unplayable placeholder) */}
       {showButtons && (
         <>
           <button onClick={prevMedia} aria-label="Previous Media" className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full z-30 transition-opacity duration-300 opacity-0 group-hover:opacity-100 focus:opacity-100 active:scale-90"> <ChevronLeft size={24} /> </button>
@@ -210,9 +207,7 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
         </>
       )}
 
-      {/* Media Content Container */}
       <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
-          {/* If it's marked unplayable AND we're fullscreen, show the large preview + link */}
            {isUnplayableVideoFormat && isFullScreen ? (
                <div className="relative w-full h-full flex flex-col items-center justify-center bg-gray-900 text-white p-4 text-center">
                    {currentMediaUrl && ( <img src={currentMediaUrl} alt={title + " (Preview)"} className="max-w-full max-h-[70vh] object-contain mb-4"/> )}
@@ -220,16 +215,14 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
                    <p className="text-base font-semibold mb-2">Video format not supported in this app.</p>
                    <a href={`https://www.reddit.com/r/${subreddit}/comments/${postId}`} target="_blank" rel="noopener noreferrer" className="text-base underline text-blue-400 hover:text-blue-300"> View Original Post on Reddit </a>
                </div>
-           ) : isVideo ? ( // Otherwise, render video if it's playable MP4
+           ) : isVideo ? (
               <video key={`${currentMediaUrl}-${currentMediaIndex}`} src={currentMediaUrl} className={cn("object-contain block", isFullScreen ? 'max-h-[90vh] max-w-[95vw]' : 'h-auto w-full')} controls={isFullScreen} muted={!isFullScreen} playsInline autoPlay={isFullScreen} loop />
-           ) : ( // Otherwise, render image
+           ) : (
               <img key={`${currentMediaUrl}-${currentMediaIndex}`} src={currentMediaUrl} alt={title} className={cn("object-cover block w-full", isFullScreen ? 'max-h-[90vh] max-w-[95vw] object-contain' : 'h-auto')} loading="lazy" />
            )}
 
-           {/* Tap overlay for grid view (only if NOT unplayable placeholder) */}
            {!isFullScreen && !isUnplayableVideoFormat && ( <div className="absolute inset-0 z-10 cursor-pointer" aria-hidden="true" /> )}
 
-           {/* Title overlay for fullscreen (only if NOT unplayable placeholder) */}
            {isFullScreen && !isUnplayableVideoFormat && (
              <div className={cn( "absolute left-0 w-full bg-gradient-to-t from-black/70 via-black/40 to-transparent text-white transition-opacity duration-300 p-4 z-20 pointer-events-none", overlayPosition === 'top' ? 'top-0 bg-gradient-to-b' : 'bottom-0 bg-gradient-to-t', isHovered ? 'opacity-100' : 'opacity-0' )} >
                <DialogTitle className="text-base md:text-lg font-semibold line-clamp-2">
@@ -242,9 +235,11 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
   );
 });
 MediaCarousel.displayName = 'MediaCarousel';
+// *** END FILLED FROM PREVIOUS ***
 
-// --- Interleaving Helper ---
-// *** FILLED FROM SNIPPET 1 ***
+
+// --- Interleaving Helper (Kept as is from previous version) ---
+// *** FILLED FROM PREVIOUS ***
 const interleavePosts = (groupedPosts: RedditPost[][]): RedditPost[] => {
     if (!groupedPosts || groupedPosts.length === 0) return [];
     const interleaved: RedditPost[] = [];
@@ -257,13 +252,17 @@ const interleavePosts = (groupedPosts: RedditPost[][]): RedditPost[] => {
     }
     return interleaved;
 };
+// *** END FILLED FROM PREVIOUS ***
+
 
 // --- Define Saved Lists Type ---
 type SavedLists = { [name: string]: string };
 
+
 // --- Home Page Component ---
 export default function Home() {
-  // --- State Variables ---
+  // --- State Variables (Filled from previous) ---
+  // *** FILLED FROM PREVIOUS ***
   const [subredditInput, setSubredditInput] = useState<string>('');
   const [posts, setPosts] = useState<RedditPost[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -272,18 +271,35 @@ export default function Home() {
   const [afterTokens, setAfterTokens] = useState<{ [subreddit: string]: string | null }>({});
   const [hasMore, setHasMore] = useState(true);
   const [fetchInitiated, setFetchInitiated] = useState(false);
-  const [favorites, setFavorites] = useState<string[]>([]); // Kept separate for potential future use
+  const [favorites, setFavorites] = useState<string[]>([]); // Kept for potential future use
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [sortType, setSortType] = useState<SortType>('hot');
   const [timeFrame, setTimeFrame] = useState<TimeFrame>('day');
   const [savedLists, setSavedLists] = useState<SavedLists>({});
   const [selectedListName, setSelectedListName] = useState<string>("");
-  const [isControlsOpen, setIsControlsOpen] = useState(false); // State for collapsible
+  const [isControlsOpen, setIsControlsOpen] = useState(false);
+  // *** END FILLED FROM PREVIOUS ***
 
   const { toast } = useToast();
 
-  // --- Load/Save Saved Lists ---
-  // *** FILLED FROM SNIPPET 1 ***
+  // *** Initialize Cache using useRef ***
+  const apiCache = useRef(new Map<CacheKey, CachedRedditResponse>()).current;
+
+  // Function to generate a unique key for caching
+  const generateCacheKey = (
+      sub: string,
+      sort: SortType,
+      time?: TimeFrame,
+      after?: string | null
+  ): CacheKey => {
+      // Ensure timeframe is always part of the key when sort is 'top'
+      const timeKey = sort === 'top' ? (time || 'all') : 'hot'; // Use 'hot' placeholder if sort isn't top
+      const afterKey = after || 'initial'; // Use 'initial' for the first page
+      return `${sub}::${sort}::${timeKey}::${afterKey}`;
+  };
+
+  // --- Load/Save Saved Lists (Filled from previous) ---
+  // *** FILLED FROM PREVIOUS ***
   useEffect(() => {
     try {
         const storedLists = localStorage.getItem(LOCAL_STORAGE_SAVED_LISTS_KEY);
@@ -296,18 +312,19 @@ export default function Home() {
     } catch (err) { console.error("Failed to load saved lists:", err); localStorage.removeItem(LOCAL_STORAGE_SAVED_LISTS_KEY); }
   }, []);
 
-  // *** FILLED FROM SNIPPET 1 ***
   useEffect(() => {
     if (Object.keys(savedLists).length > 0) {
          try { localStorage.setItem(LOCAL_STORAGE_SAVED_LISTS_KEY, JSON.stringify(savedLists)); }
          catch (err) { console.error("Failed to save lists:", err); toast({ variant: "destructive", title: "Storage Error" }); }
     } else { localStorage.removeItem(LOCAL_STORAGE_SAVED_LISTS_KEY); }
   }, [savedLists, toast]);
+  // *** END FILLED FROM PREVIOUS ***
 
-  // --- Infinite Scroll ---
+
+  // --- Infinite Scroll (Filled from previous) ---
+  // *** FILLED FROM PREVIOUS ***
   const observer = useRef<IntersectionObserver>();
   const loadMorePostsRef = useRef<() => Promise<void>>();
-  // *** FILLED FROM SNIPPET 1 ***
   const lastPostRef = useCallback(
     (node: HTMLDivElement | null) => {
       if (isLoading) return;
@@ -317,118 +334,214 @@ export default function Home() {
       }, { threshold: 0.5 });
       if (node) observer.current.observe(node);
     }, [isLoading, hasMore, fetchInitiated] );
+  // *** END FILLED FROM PREVIOUS ***
 
-   // --- Data Fetching ---
-   // *** FILLED FROM SNIPPET 1 ***
+
+   // --- Data Fetching (Updated for Caching) ---
    const performFetch = useCallback(async (
-      subredditsToFetch: string[], currentSortType: SortType,
-      currentTimeFrame: TimeFrame | undefined, currentAfterTokens: { [subreddit: string]: string | null }
-   ): Promise<{ groupedPosts: RedditPost[][]; updatedAfterTokens: { [subreddit: string]: string | null }; anyHasMore: boolean; }> => {
+      subredditsToFetch: string[],
+      currentSortType: SortType,
+      currentTimeFrame: TimeFrame | undefined,
+      currentAfterTokens: { [subreddit: string]: string | null }
+   ): Promise<{
+        groupedPosts: RedditPost[][];
+        updatedAfterTokens: { [subreddit: string]: string | null };
+        anyHasMore: boolean;
+    }> => {
+
     if (subredditsToFetch.length === 0) return { groupedPosts: [], updatedAfterTokens: {}, anyHasMore: false };
     if (!subredditsToFetch.every(isValidSubreddit)) throw new Error("Invalid subreddit name found.");
+
     type SuccessfulFetchValue = { posts: RedditPost[]; after: string | null; sub: string; };
     let overallError: Error | null = null;
-    try {
-      const results: PromiseSettledResult<SuccessfulFetchValue>[] = await Promise.allSettled(
-        subredditsToFetch.map(async sub => {
-          const afterParam = currentAfterTokens[sub] ?? undefined;
-          // Correctly handle unplayable video format prop in getPosts
-          const response = await getPosts( sub, currentSortType, { timeFrame: currentSortType === 'top' ? currentTimeFrame : undefined, after: afterParam, limit: POSTS_PER_LOAD });
-           // Add subreddit and unplayable flag to each post
-           const postsWithMetadata = response.posts.map(p => ({
+    const fetchPromises: Promise<SuccessfulFetchValue>[] = []; // Store promises to run in parallel
+    const subOrderForResults: string[] = []; // Keep track of the original sub order
+
+    // Use Promise.allSettled, but check cache first
+    for (const sub of subredditsToFetch) {
+        const afterParam = currentAfterTokens[sub] ?? undefined; // Correctly get 'after' for this specific sub
+        // Use the provided currentTimeFrame for the key generation
+        const cacheKey = generateCacheKey(sub, currentSortType, currentSortType === 'top' ? currentTimeFrame : undefined, afterParam);
+        subOrderForResults.push(sub); // Store sub in the order promises are added
+
+        if (apiCache.has(cacheKey)) {
+            // *** Cache Hit ***
+            console.log(`%cCache HIT for key: ${cacheKey}`, 'color: green');
+            const cachedData = apiCache.get(cacheKey)!;
+            // Add subreddit context back (it's not stored in the cache object itself)
+            // Ensure isUnplayableVideoFormat is present (might not be in older cache entries)
+             const postsWithMetadata = cachedData.posts.map(p => ({
                 ...p,
                 subreddit: sub,
-                isUnplayableVideoFormat: p.isUnplayableVideoFormat ?? false // Ensure flag exists
+                isUnplayableVideoFormat: p.isUnplayableVideoFormat ?? false // Add default if missing
             }));
-           return { posts: postsWithMetadata, after: response.after, sub: sub };
-        })
-      );
-      const successfulResults: SuccessfulFetchValue[] = []; const errors: { sub: string, reason: unknown }[] = [];
-      const updatedAfterTokens: { [subreddit: string]: string | null } = {};
-      results.forEach((result, index) => {
-          const sub = subredditsToFetch[index];
-          if (result.status === 'fulfilled') { successfulResults.push(result.value); updatedAfterTokens[sub] = result.value.after; }
-          else {
-              console.error(`Failed to fetch from r/${sub}:`, result.reason); errors.push({ sub: sub, reason: result.reason });
-              updatedAfterTokens[sub] = currentAfterTokens[sub] ?? null;
-              if (!overallError) { overallError = result.reason instanceof Error ? result.reason : new Error(`Fetch failed for r/${sub}: ${String(result.reason)}`); }
-          }
-      });
+            // Wrap cached data in a resolved promise
+            fetchPromises.push(Promise.resolve({
+                posts: postsWithMetadata,
+                after: cachedData.after,
+                sub: sub
+            }));
+        } else {
+            // *** Cache Miss - Fetch from API ***
+            console.log(`%cCache MISS for key: ${cacheKey}`, 'color: orange');
+            fetchPromises.push(
+                getPosts(sub, currentSortType, {
+                    timeFrame: currentSortType === 'top' ? currentTimeFrame : undefined,
+                    after: afterParam,
+                    limit: POSTS_PER_LOAD
+                }).then(response => {
+                    // Store successful fetch in cache
+                    // The cached posts don't need the subreddit prop, it's added back on retrieval
+                    const dataToCache: CachedRedditResponse = {
+                         posts: response.posts, // Store raw posts from API
+                         after: response.after
+                     };
+                    apiCache.set(cacheKey, dataToCache);
+                    console.log(`%cStored in cache: ${cacheKey}`, 'color: blue');
+
+                    // Add subreddit context & ensure unplayable flag for processing
+                    const postsWithMetadata = response.posts.map(p => ({
+                        ...p,
+                        subreddit: sub,
+                        isUnplayableVideoFormat: p.isUnplayableVideoFormat ?? false
+                    }));
+                    return { posts: postsWithMetadata, after: response.after, sub: sub };
+                })
+                // Let Promise.allSettled handle rejections
+            );
+        }
+    }
+
+    // Process results (cached or fetched)
+    try {
+        const results: PromiseSettledResult<SuccessfulFetchValue>[] = await Promise.allSettled(fetchPromises);
+        const successfulResults: SuccessfulFetchValue[] = [];
+        const errors: { sub: string, reason: unknown }[] = [];
+        const updatedAfterTokens: { [subreddit: string]: string | null } = {};
+
+        results.forEach((result, index) => {
+            // Use the tracked order to get the correct subreddit for this result
+            const sub = subOrderForResults[index];
+
+            if (result.status === 'fulfilled') {
+                successfulResults.push(result.value);
+                // Make sure we update the token for the correct sub
+                updatedAfterTokens[sub] = result.value.after;
+            } else {
+                console.error(`Failed to fetch/process for r/${sub}:`, result.reason);
+                errors.push({ sub: sub, reason: result.reason });
+                // Preserve existing token if fetch failed for this sub
+                updatedAfterTokens[sub] = currentAfterTokens[sub] ?? null;
+                if (!overallError) { overallError = result.reason instanceof Error ? result.reason : new Error(`Fetch failed for r/${sub}: ${String(result.reason)}`); }
+            }
+        });
+
        if (overallError && successfulResults.length === 0) throw new Error(`All subreddit fetches failed. First error`);
-       else if (overallError) toast({ variant: "destructive", title: "Fetch Warning", description: `Could not load posts from some subreddits. Check console.`});
+       else if (overallError) toast({ variant: "destructive", title: "Fetch Warning", description: `Could not load some subreddits. Check console.`});
+
+      // Group posts based on the successful results (order should align with subOrderForResults initially)
       const groupedPosts = successfulResults.map(res => res.posts);
       const anyHasMore = Object.values(updatedAfterTokens).some(token => token !== null);
-      const finalUpdatedTokens = {...currentAfterTokens, ...updatedAfterTokens};
-      return { groupedPosts, updatedAfterTokens: finalUpdatedTokens, anyHasMore };
-    } catch (e) { if (e instanceof Error) { throw e; } else { throw new Error('An unexpected error occurred during the fetch process.'); } }
-   }, [toast]); // Make sure getPosts in services returns the isUnplayableVideoFormat flag
 
-   // *** FILLED FROM SNIPPET 1 (with necessary adjustments for 'favorites') ***
+      // IMPORTANT: Ensure the final tokens object merges correctly, preserving tokens for subs not in the current fetch batch
+      const finalUpdatedTokens = {...currentAfterTokens, ...updatedAfterTokens};
+
+      return { groupedPosts, updatedAfterTokens: finalUpdatedTokens, anyHasMore };
+
+    } catch (e) { if (e instanceof Error) { throw e; } else { throw new Error('An unexpected error occurred during the fetch process.'); } }
+   }, [apiCache, toast]); // Added apiCache, toast dependencies
+
    const fetchInitialPosts = useCallback(async () => {
      let subsToUse = parseSubreddits(subredditInput);
-     // Note: 'favorites' state is kept but not used for fetching in Snippet 1's fetch logic. Keeping it that way unless needed.
-     // if (subsToUse.length === 0 && favorites.length > 0) { subsToUse = favorites; }
+     // Removed favorites logic from here as it wasn't used in previous fetch logic
      if (subsToUse.length === 0) {
-       setError("Please enter at least one valid subreddit name.");
-       setPosts([]); // Clear posts if input is empty
-       setFetchInitiated(false); // Reset fetch state
-       setHasMore(false);
-       return;
+        setError("Please enter at least one valid subreddit name.");
+        setPosts([]);
+        setFetchInitiated(false);
+        setHasMore(false);
+        return;
      }
+
+     // *** Clear cache only for the specific initial request keys ***
+     console.log("Clearing initial cache for relevant keys...");
+     subsToUse.forEach(sub => {
+         // Use undefined for 'after' to match initial load key generation
+         const initialCacheKey = generateCacheKey(sub, sortType, sortType === 'top' ? timeFrame : undefined, undefined);
+         if (apiCache.has(initialCacheKey)) {
+             apiCache.delete(initialCacheKey);
+             console.log(`%cCleared initial cache key: ${initialCacheKey}`, 'color: red');
+         }
+     });
+
      setIsLoading(true); setError(null); setPosts([]); setAfterTokens({}); setHasMore(true); setFetchInitiated(true);
      try {
+         // Pass empty tokens map {} for initial fetch
          const { groupedPosts, updatedAfterTokens, anyHasMore } = await performFetch( subsToUse, sortType, timeFrame, {} );
          const interleavedInitialPosts = interleavePosts(groupedPosts);
-         setPosts(interleavedInitialPosts); setAfterTokens(updatedAfterTokens); setHasMore(anyHasMore);
+         setPosts(interleavedInitialPosts);
+         setAfterTokens(updatedAfterTokens); // Set the complete tokens map from the fetch result
+         setHasMore(anyHasMore);
           if (interleavedInitialPosts.length === 0 && anyHasMore === false && !error) {
-              // Display a more specific message if input was valid but no posts found
-              if (subsToUse.every(isValidSubreddit)) {
+               if (subsToUse.every(isValidSubreddit)) {
                   toast({ description: `No posts found for "${subsToUse.join(', ')}" with the current filters.` });
-              } else {
-                  // This case should be less likely due to validation in performFetch, but good to handle
-                  toast({ description: "No posts found." });
-              }
+               } else {
+                   toast({ description: "No posts found." });
+               }
           }
      } catch (e) {
-         if (e instanceof Error) { setError(`Failed to fetch posts: ${e.message}`); }
+         if (e instanceof Error) { setError(`Fetch error: ${e.message}`); }
          else { setError('An unknown error occurred during the initial fetch.'); }
          setHasMore(false);
-         setPosts([]); // Clear posts on error
+         setPosts([]);
      } finally { setIsLoading(false); }
-   }, [subredditInput, /* favorites, */ sortType, timeFrame, toast, performFetch]); // Removed favorites dependency to match S1 logic
+   }, [subredditInput, /* favorites, */ sortType, timeFrame, toast, performFetch, apiCache]); // Removed 'favorites'
 
-   // *** FILLED FROM SNIPPET 1 (with necessary adjustments for 'favorites') ***
    const loadMorePosts = useCallback(async () => {
      if (isLoading || !hasMore || !fetchInitiated) return;
+
      let subsToUse = parseSubreddits(subredditInput);
-     // Note: 'favorites' state is kept but not used for fetching in Snippet 1's fetch logic. Keeping it that way unless needed.
-     // if (subsToUse.length === 0 && favorites.length > 0) { subsToUse = favorites; }
-     if (subsToUse.length === 0) { setHasMore(false); return; } // Should not happen if fetchInitiated is true
+     // Removed favorites logic
+     if (subsToUse.length === 0) { setHasMore(false); return; }
 
-     const subsWithPotentialMore = subsToUse.filter(sub => afterTokens[sub] !== null);
-       if (subsWithPotentialMore.length === 0) { setHasMore(false); return; } // All loaded subreddits reached their end
+     // Filter based on *current* afterTokens state for *these* subreddits
+     const subsWithPotentialMore = subsToUse.filter(sub => afterTokens[sub] !== null && afterTokens[sub] !== undefined);
 
-     setIsLoading(true); setError(null); // Don't clear error on load more, keep previous if any
+     if (subsWithPotentialMore.length === 0) {
+         console.log("No more posts to load for the current subreddits.");
+         setHasMore(false);
+         return;
+     }
+
+     setIsLoading(true); setError(null); // Clear previous errors when attempting to load more
      try {
+          // Fetch normally, performFetch will check cache or fetch for relevant 'after' keys
+          // Pass the *current* full afterTokens map
           const { groupedPosts, updatedAfterTokens, anyHasMore } = await performFetch( subsWithPotentialMore, sortType, timeFrame, afterTokens );
          const interleavedNewPosts = interleavePosts(groupedPosts);
          setPosts(prevPosts => [...prevPosts, ...interleavedNewPosts]);
-         setAfterTokens(updatedAfterTokens); setHasMore(anyHasMore);
+         // Update the state with the latest tokens map from the fetch result
+         setAfterTokens(updatedAfterTokens);
+         setHasMore(anyHasMore);
      } catch (e) {
-         if (e instanceof Error) { setError(`Failed to load more posts: ${e.message}`); }
+         if (e instanceof Error) { setError(`Load more error: ${e.message}`); }
          else { setError('An unknown error occurred while loading more posts.'); }
-         setHasMore(false); // Stop trying to load more if an error occurs
+         setHasMore(false); // Stop trying if error occurs
      } finally { setIsLoading(false); }
-   }, [isLoading, hasMore, fetchInitiated, afterTokens, subredditInput, /* favorites, */ sortType, timeFrame, toast, performFetch]); // Removed favorites dependency
+   }, [isLoading, hasMore, fetchInitiated, afterTokens, subredditInput, /* favorites, */ sortType, timeFrame, toast, performFetch, apiCache]); // Removed 'favorites'
 
+   // Assign loadMorePosts to the ref whenever it changes
    useEffect(() => { loadMorePostsRef.current = loadMorePosts; }, [loadMorePosts]);
 
-  // --- Event Handlers ---
+
+  // --- Event Handlers (Filled from previous) ---
+  // *** FILLED FROM PREVIOUS ***
   const handleThumbnailClick = useCallback((post: RedditPost) => { setSelectedPost(post); setIsDialogOpen(true); }, []);
   const handleDialogClose = useCallback(() => { setIsDialogOpen(false); setTimeout(() => { setSelectedPost(null); }, 300); }, []);
+  // *** END FILLED FROM PREVIOUS ***
 
-  // --- Saved Lists Handlers ---
-   // *** FILLED FROM SNIPPET 1 ***
+
+  // --- Saved Lists Handlers (Filled from previous) ---
+  // *** FILLED FROM PREVIOUS ***
    const handleSaveList = useCallback(() => {
         const currentInput = subredditInput.trim(); if (!currentInput) { toast({ variant: "destructive", description: "Input field is empty." }); return; }
         const listName = window.prompt("Enter a name for this list:", ""); if (listName === null) return;
@@ -437,13 +550,11 @@ export default function Home() {
         setSavedLists(prev => ({ ...prev, [trimmedName]: currentInput })); toast({ description: `List "${trimmedName}" saved.` }); setSelectedListName(trimmedName);
    }, [subredditInput, toast]);
 
-   // *** FILLED FROM SNIPPET 1 ***
    const handleLoadList = useCallback((listName: string) => {
         if (listName && savedLists[listName]) { setSubredditInput(savedLists[listName]); setSelectedListName(listName); setTimeout(() => { fetchInitialPosts(); }, 0); }
         else if (listName === "" || !savedLists[listName]) { setSelectedListName(""); }
-   }, [savedLists, fetchInitialPosts]);
+   }, [savedLists, fetchInitialPosts]); // Depends on fetchInitialPosts
 
-   // *** FILLED FROM SNIPPET 1 ***
    const handleDeleteList = useCallback(() => {
         if (!selectedListName) { toast({ variant: "destructive", description: "No list selected to delete." }); return; }
         if (window.confirm(`Delete list "${selectedListName}"?`)) {
@@ -451,11 +562,17 @@ export default function Home() {
             setSelectedListName(""); toast({ description: `List "${selectedListName}" deleted.` });
         }
    }, [selectedListName, toast]);
+   // *** END FILLED FROM PREVIOUS ***
 
-   // --- Masonry Breakpoint Configuration ---
+
+   // --- Masonry Breakpoint Configuration (Filled from previous) ---
+   // *** FILLED FROM PREVIOUS ***
    const breakpointColumnsObj = { default: 6, 1280: 5, 1024: 4, 768: 3 };
+   // *** END FILLED FROM PREVIOUS ***
+
 
    // --- Render ---
+   // *** FILLED FROM PREVIOUS (JSX structure) ***
    const savedListNames = Object.keys(savedLists);
 
   return (
@@ -464,7 +581,6 @@ export default function Home() {
         <h1 className="text-3xl sm:text-4xl font-bold text-center mb-4 sm:mb-6">Sub Gallery</h1>
         <div className="max-w-xl mx-auto space-y-3">
             <div className="flex flex-col sm:flex-row items-stretch gap-2">
-                 
                  <Input
                     type="text"
                     aria-label="Enter subreddit names separated by commas"
@@ -474,7 +590,6 @@ export default function Home() {
                     className="flex-grow text-base"
                     onKeyDown={(e) => { if (e.key === 'Enter' && !isLoading) fetchInitialPosts(); }}
                  />
-                 
                  <Button
                     onClick={fetchInitialPosts}
                     disabled={isLoading}
@@ -492,7 +607,6 @@ export default function Home() {
                      </CollapsibleTrigger>
                  </div>
                 <CollapsibleContent className="space-y-3 overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
-                    
                     <div className="flex flex-col sm:flex-row items-stretch gap-2 pt-2">
                         <Select value={selectedListName} onValueChange={handleLoadList} disabled={isLoading}>
                             <SelectTrigger className="flex-grow" aria-label="Load saved list"><SelectValue placeholder="Load saved list..." /></SelectTrigger>
@@ -504,7 +618,6 @@ export default function Home() {
                         <Button onClick={handleSaveList} variant="outline" size="icon" aria-label="Save current list" title="Save current list" className="active:scale-95 transition-transform" disabled={isLoading || !subredditInput.trim()}><Save className="h-4 w-4" /></Button>
                         <Button onClick={handleDeleteList} variant="destructive" size="icon" aria-label="Delete selected list" title="Delete selected list" disabled={!selectedListName || isLoading} className="active:scale-95 transition-transform"><Trash2 className="h-4 w-4" /></Button>
                     </div>
-                    
                     <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-center justify-center pt-2">
                         <RadioGroup defaultValue="hot" className="flex gap-4" value={sortType} onValueChange={(value) => { if(!isLoading) setSortType(value as SortType)}} aria-label="Sort posts by" >
                             <Label htmlFor="sort-hot" className={cn("flex items-center space-x-2 p-1 rounded", isLoading ? "text-muted-foreground cursor-not-allowed" : "cursor-pointer hover:bg-accent")}> <RadioGroupItem value="hot" id="sort-hot" disabled={isLoading}/> <span>Hot</span> </Label>
@@ -519,13 +632,11 @@ export default function Home() {
       </header>
 
       <main className="flex-grow mt-2">
-        
         {isLoading && posts.length === 0 && !error && (
             <Masonry breakpointCols={breakpointColumnsObj} className="my-masonry-grid flex gap-1.5" columnClassName="my-masonry-grid_column">
                  {Array.from({ length: 18 }).map((_, index) => ( <Skeleton key={`skeleton-${index}`} className="h-64 w-full mb-1.5" /> ))}
             </Masonry>
         )}
-        
         {fetchInitiated && posts.length === 0 && !isLoading && !error && ( <p className="text-center text-muted-foreground mt-10">No posts found.</p> )}
         {posts.length > 0 && (
           <Masonry breakpointCols={breakpointColumnsObj} className="my-masonry-grid flex gap-1.5" columnClassName="my-masonry-grid_column">
@@ -533,21 +644,20 @@ export default function Home() {
                 const firstUrl=post?.mediaUrls?.[0];
                 const isVideoPost=firstUrl&&firstUrl.endsWith('.mp4');
                 const isGalleryPost=post?.mediaUrls?.length>1;
-                const isUnplayable = post.isUnplayableVideoFormat; // Get the flag
+                const isUnplayable = post.isUnplayableVideoFormat ?? false; // Ensure default
                 return (
                 <div key={`${post.subreddit}-${post.postId}`} ref={posts[posts.length-1]===post?lastPostRef:null} className="mb-1.5">
-                 <Card onClick={()=> !isUnplayable && handleThumbnailClick(post)} // Disable click if unplayable
+                 <Card onClick={()=> !isUnplayable && handleThumbnailClick(post)}
                        className={cn(
                             "group relative overflow-hidden bg-gray-100 dark:bg-gray-800 flex items-center justify-center transition-all duration-200",
-                            !isUnplayable && "hover:shadow-lg hover:scale-[1.02] active:scale-95 cursor-pointer", // Hover/active effects only if playable
-                            isUnplayable && "cursor-default" // Default cursor if unplayable
+                            !isUnplayable && "hover:shadow-lg hover:scale-[1.02] active:scale-95 cursor-pointer",
+                            isUnplayable && "cursor-default"
                        )}>
-                     {/* Show icon indicator for Video, Gallery, or Unplayable */}
                      {(isVideoPost || isGalleryPost || isUnplayable) && (
                         <div className="absolute top-1 right-1 z-20 p-1 rounded-full bg-black/40 text-white transition-opacity opacity-70 group-hover:opacity-100">
-                            {isUnplayable ? <Video className="h-3 w-3 opacity-70"/> : // Dimmed video icon for unplayable
-                             isVideoPost ? <Video className="h-3 w-3"/> :             // Regular video icon
-                             <GalleryIcon className="h-3 w-3"/>}                      
+                            {isUnplayable ? <Video className="h-3 w-3 opacity-70"/> :
+                             isVideoPost ? <Video className="h-3 w-3"/> :
+                             <GalleryIcon className="h-3 w-3"/>}
                         </div>
                      )}
                      <MediaCarousel
@@ -562,16 +672,12 @@ export default function Home() {
             })}
            </Masonry>
         )}
-        
         {isLoading && posts.length > 0 && ( <div className="flex justify-center items-center gap-2 text-center mt-6 p-4 text-muted-foreground"> <Loader2 className="h-4 w-4 animate-spin" /> Loading more... </div> )}
-        
         {!hasMore && fetchInitiated && posts.length > 0 && ( <p className="text-center mt-6 p-4 text-muted-foreground">You've reached the end!</p> )}
       </main>
 
-      {/* Dialog with corrected structure for close button positioning (Close button moved inside MediaCarousel for fullscreen) */}
       <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
         <DialogContent className="max-w-none w-[95vw] h-[95vh] p-0 bg-transparent border-none overflow-hidden flex items-center justify-center">
-           {/* Inner wrapper for background, padding, backdrop, and relative positioning */}
            <div className="relative w-full h-full flex items-center justify-center bg-black/90 backdrop-blur-sm p-1 sm:p-2">
               <DialogTitle className="sr-only"> Expanded view: {selectedPost?.title || 'Reddit Post'} </DialogTitle>
               <DialogDescription className="sr-only"> Expanded view of Reddit post: {selectedPost?.title || 'Content'}... </DialogDescription>
@@ -582,10 +688,9 @@ export default function Home() {
                     subreddit={selectedPost.subreddit}
                     postId={selectedPost.postId}
                     isFullScreen={true}
-                    isUnplayableVideoFormat={selectedPost.isUnplayableVideoFormat ?? false} // Pass the flag, default to false if missing
+                    isUnplayableVideoFormat={selectedPost.isUnplayableVideoFormat ?? false}
                  />
               ) : ( <div className="text-white text-xl">Loading content...</div> )}
-              {/* Close button is now rendered *inside* MediaCarousel when isFullScreen=true */}
            </div>
         </DialogContent>
       </Dialog>
@@ -594,5 +699,6 @@ export default function Home() {
         <p> Built with ❤️ </p>
       </footer>
     </div>
-  );
+   );
+   // *** END FILLED FROM PREVIOUS (JSX structure) ***
 }
