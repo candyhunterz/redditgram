@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { RedditPost, getPosts, SortType, TimeFrame } from "@/services/reddit";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Trash2, Save, X, Video, Copy as GalleryIcon, Filter, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trash2, Save, X, Video, Copy as GalleryIcon, Filter, Loader2, ArrowUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -273,6 +273,7 @@ export default function Home() {
   const [savedLists, setSavedLists] = useState<SavedLists>({});
   const [selectedListName, setSelectedListName] = useState<string>("");
   const [isControlsOpen, setIsControlsOpen] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   const { toast } = useToast();
 
@@ -463,6 +464,22 @@ export default function Home() {
 
    useEffect(() => { loadMorePostsRef.current = loadMorePosts; }, [loadMorePosts]);
 
+   // --- Scroll Listener Effect for Scroll-to-Top Button ---
+  useEffect(() => {
+    const checkScrollTop = () => {
+      // Show button if scrolled down more than (e.g.) 400px
+      if (!showScrollTop && window.scrollY > 400) {
+        setShowScrollTop(true);
+      } else if (showScrollTop && window.scrollY <= 400) {
+        setShowScrollTop(false);
+      }
+    };
+
+    window.addEventListener('scroll', checkScrollTop);
+    // Cleanup function to remove listener when component unmounts
+    return () => window.removeEventListener('scroll', checkScrollTop);
+  }, [showScrollTop]);
+
 
   // --- Event Handlers ---
   const handleThumbnailClick = useCallback((post: RedditPost) => { setSelectedPost(post); setIsDialogOpen(true); }, []);
@@ -489,6 +506,14 @@ export default function Home() {
             setSelectedListName(""); toast({ description: `List "${selectedListName}" deleted.` });
         }
    }, [selectedListName, toast]);
+
+   // --- Scroll to Top Function ---
+   const scrollToTop = () => {
+    window.scrollTo({
+        top: 0,
+        behavior: 'smooth' // Smooth scrolling animation
+    });
+};
 
    // --- Masonry Breakpoint Configuration ---
    const breakpointColumnsObj = { default: 6, 1280: 5, 1024: 4, 768: 3 };
@@ -600,6 +625,20 @@ export default function Home() {
         {/* End Reached Message */}
         {!hasMore && fetchInitiated && posts.length > 0 && ( <p className="text-center mt-6 p-4 text-muted-foreground">You've reached the end!</p> )}
       </main>
+       {/* --- Scroll-to-Top Button --- */}
+      {/* Render button conditionally based on state */}
+      {showScrollTop && (
+          <Button
+             onClick={scrollToTop}
+             variant="secondary" // Or outline/ghost
+             size="icon"
+             aria-label="Scroll to top"
+             // Fixed position, bottom-right corner with margin, high z-index
+             className="fixed bottom-4 right-4 z-50 h-10 w-10 rounded-full shadow-md active:scale-90 transition-all duration-200"
+           >
+              <ArrowUp className="h-5 w-5" />
+           </Button>
+      )}
 
       {/* Fullscreen Dialog */}
       {/* *** DIALOG UPDATED: Removed DialogClose button from here *** */}
