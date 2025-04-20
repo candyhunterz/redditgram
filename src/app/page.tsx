@@ -1,14 +1,14 @@
 // src/app/page.tsx
 "use client";
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 // *** Standard Imports ***
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RedditPost, getPosts, SortType, TimeFrame } from "@/services/reddit";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Trash2, Save, X, Video, Copy as GalleryIcon, Filter, Loader2, ArrowUp } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trash2, Save, X, Video, Copy as GalleryIcon, Filter, Loader2, ArrowUp, Heart } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -49,18 +49,30 @@ const parseSubreddits = (input: string): string[] => {
 
 const POSTS_PER_LOAD = 20;
 const LOCAL_STORAGE_SAVED_LISTS_KEY = "savedSubredditLists";
+const LOCAL_STORAGE_FAVORITES_KEY = "favoritePosts";
 
 
-// --- Define Cache Types ---
+// --- Define Types ---
 type CachedRedditResponse = {
     posts: RedditPost[];
     after: string | null;
 };
 type CacheKey = string;
 
+// --- Define Favorites Types ---
+interface FavoritePostInfo {
+    postId: string;
+    title: string;
+    subreddit: string;
+    thumbnailUrl: string | undefined;
+}
+type FavoritesMap = { [postId: string]: FavoritePostInfo };
+
+// --- Define Saved Lists Type ---
+type SavedLists = { [name: string]: string };
+
 
 // --- MediaCarousel Component (Updated with Top Control Bar) ---
-// *** NEW MediaCarousel IMPLEMENTATION FROM SNIPPET ***
 interface MediaCarouselProps {
   mediaUrls: string[];
   title: string;
@@ -68,16 +80,17 @@ interface MediaCarouselProps {
   postId: string;
   isFullScreen?: boolean;
   isUnplayableVideoFormat?: boolean;
+  onToggleFavorite?: () => void;
+  isFavorite?: boolean;
 }
 
 const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
-    mediaUrls, title, subreddit, postId, isFullScreen = false, isUnplayableVideoFormat = false
+    mediaUrls, title, subreddit, postId, isFullScreen = false, isUnplayableVideoFormat = false,
+    onToggleFavorite, isFavorite = false
 }) => {
     // --- State and Refs ---
     const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
-    // Hover state no longer needed for core functionality but kept if useful elsewhere
-    // const [isHovered, setIsHovered] = useState(false);
     const touchStartX = useRef<number | null>(null);
     const touchEndX = useRef<number | null>(null);
     const swipeThreshold = 50;
@@ -119,7 +132,7 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
 
     // --- Effects ---
     // Reset index when media changes
-    useEffect(() => { setCurrentMediaIndex(0); /* setIsHovered(false); */ }, [mediaUrls]);
+    useEffect(() => { setCurrentMediaIndex(0); }, [mediaUrls]);
 
     // Keyboard navigation effect
     useEffect(() => {
@@ -146,7 +159,7 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
               {currentMediaUrl && ( <img src={currentMediaUrl} alt={title + " (Preview)"} className="absolute inset-0 w-full h-full object-cover opacity-10 dark:opacity-5 blur-[2px]" loading="lazy" /> )}
               <div className="relative z-10 flex flex-col items-center">
                    <Video className="w-6 h-6 mb-1 opacity-40" />
-                   <p className="text-xs font-semibold leading-tight line-clamp-2" title={title}> {/* Added line-clamp and title attribute */}
+                   <p className="text-xs font-semibold leading-tight line-clamp-2" title={title}>
                          {title}
                      </p>
                    <p className="text-xs font-medium leading-tight">Video format not supported</p>
@@ -159,7 +172,7 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
     // Main Render (Playable Content or Fullscreen)
     return (
         <div
-            className="relative group w-full h-full bg-black select-none" // Keep relative
+            className="relative group w-full h-full bg-black select-none"
             onTouchStart={isFullScreen ? handleTouchStart : undefined}
             onTouchMove={isFullScreen ? handleTouchMove : undefined}
             onTouchEnd={isFullScreen ? handleTouchEnd : undefined}
@@ -168,25 +181,34 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
             {/* === Top Control Bar (Rendered only when fullscreen) === */}
             {isFullScreen && (
                 <div className="absolute top-0 left-0 right-0 z-40 p-2 bg-gradient-to-b from-black/60 via-black/40 to-transparent flex justify-between items-center">
-                    {/* Left side (can be empty or add title/info later) */}
-                    <div className="w-8 h-8"> {/* Placeholder to balance flex, match button size */} </div>
+                    {/* Left side - Favorite Button */}
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-full text-white hover:bg-white/20 active:scale-90"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleFavorite?.();
+                        }}
+                    >
+                        <Heart className={cn("h-5 w-5", isFavorite ? "fill-current" : "")} />
+                    </Button>
 
                     {/* Right side - Close Button */}
                     <DialogClose asChild>
                         <Button
-                           variant="ghost" size="icon" aria-label="Close dialog"
-                           // Styling for button in bar
-                           className="rounded-full h-8 w-8 text-white hover:bg-white/20 active:scale-90 focus-visible:ring-1 focus-visible:ring-white focus-visible:ring-offset-0" // Added focus style
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Close dialog"
+                            className="rounded-full h-8 w-8 text-white hover:bg-white/20 active:scale-90 focus-visible:ring-1 focus-visible:ring-white focus-visible:ring-offset-0"
                         >
-                           <X className="h-5 w-5" />
+                            <X className="h-5 w-5" />
                         </Button>
                     </DialogClose>
                 </div>
             )}
-            {/* === End Top Control Bar === */}
 
-
-            {/* Navigation Arrows & Dots (Ensure z-index < control bar) */}
+            {/* Navigation Arrows & Dots */}
             {showButtons && (
                 <>
                  <button onClick={prevMedia} aria-label="Previous Media" className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full z-30 transition-opacity duration-300 opacity-0 group-hover:opacity-100 focus:opacity-100 active:scale-90"> <ChevronLeft size={24}/> </button>
@@ -199,7 +221,6 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
 
             {/* Media Content Container */}
             <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
-                {/* Render unplayable placeholder OR video/image */}
                  {isUnplayableVideoFormat && isFullScreen ? (
                      <div className="relative w-full h-full flex flex-col items-center justify-center bg-gray-900 text-white p-4 text-center">
                          {currentMediaUrl && ( <img src={currentMediaUrl} alt={title + " (Preview)"} className="max-w-full max-h-[70vh] object-contain mb-4"/> )}
@@ -213,16 +234,12 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
                     <img key={`${currentMediaUrl}-${currentMediaIndex}`} src={currentMediaUrl} alt={title} className={cn("object-cover block w-full", isFullScreen ? 'max-h-[90vh] max-w-[95vw] object-contain' : 'h-auto')} loading="lazy" />
                  )}
 
-                 {/* Tap overlay for grid view */}
                  {!isFullScreen && !isUnplayableVideoFormat && ( <div className="absolute inset-0 z-10 cursor-pointer" aria-hidden="true" /> )}
 
-                 {/* Fullscreen Title Overlay - NOW AT THE BOTTOM */}
                  {isFullScreen && !isUnplayableVideoFormat && (
                      <div
-                        // Placed at bottom, always visible, z-index 30 so above dots (z-20) but below top bar (z-40)
                         className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/70 via-black/40 to-transparent text-white p-4 z-30 pointer-events-none"
                       >
-                         {/* Use standard DialogTitle for consistency or just a p tag */}
                          <p className="text-base md:text-lg font-semibold">
                              {title} (From: <a href={`https://www.reddit.com/r/${subreddit}/comments/${postId}`} target="_blank" rel="noopener noreferrer" className="underline pointer-events-auto" onClick={(e) => e.stopPropagation()} > r/{subreddit} </a>)
                          </p>
@@ -233,7 +250,6 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
     );
 });
 MediaCarousel.displayName = 'MediaCarousel';
-// *** END NEW MediaCarousel IMPLEMENTATION ***
 
 
 // --- Interleaving Helper ---
@@ -251,10 +267,6 @@ const interleavePosts = (groupedPosts: RedditPost[][]): RedditPost[] => {
 };
 
 
-// --- Define Saved Lists Type ---
-type SavedLists = { [name: string]: string };
-
-
 // --- Home Page Component ---
 export default function Home() {
   // --- State Variables ---
@@ -266,7 +278,8 @@ export default function Home() {
   const [afterTokens, setAfterTokens] = useState<{ [subreddit: string]: string | null }>({});
   const [hasMore, setHasMore] = useState(true);
   const [fetchInitiated, setFetchInitiated] = useState(false);
-  const [favorites, setFavorites] = useState<string[]>([]);
+  const [favorites, setFavorites] = useState<FavoritesMap>({});
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [sortType, setSortType] = useState<SortType>('hot');
   const [timeFrame, setTimeFrame] = useState<TimeFrame>('day');
@@ -284,6 +297,29 @@ export default function Home() {
       const afterKey = after || 'initial';
       return `${sub}::${sort}::${timeKey}::${afterKey}`;
   };
+
+  // --- Filtered Posts ---
+  const postsToDisplay = useMemo(() => {
+    if (!showFavoritesOnly) {
+        // When showing all posts, return the fetched posts array directly
+        // Ensure the isUnplayable flag from fetch is preserved
+        return posts.map(p => ({...p, isUnplayableVideoFormat: p.isUnplayableVideoFormat ?? false}));
+    } else {
+        // When showing only favorites, map the favorites map values
+        return Object.values(favorites).map((favInfo): RedditPost => {
+            const thumbnailUrl = favInfo.thumbnailUrl;
+
+            return {
+              postId: favInfo.postId,
+              title: favInfo.title,
+              subreddit: favInfo.subreddit,
+              mediaUrls: thumbnailUrl ? [thumbnailUrl] : [], // Use thumbnail
+              // *** FIX: Assume thumbnail is displayable, don't mark as unplayable video ***
+              isUnplayableVideoFormat: false
+            };
+        });
+    }
+  }, [posts, favorites, showFavoritesOnly]);
 
   // --- Load/Save Saved Lists ---
   useEffect(() => {
@@ -305,18 +341,67 @@ export default function Home() {
     } else { localStorage.removeItem(LOCAL_STORAGE_SAVED_LISTS_KEY); }
   }, [savedLists, toast]);
 
+  // --- Load/Save Favorites ---
+  useEffect(() => {
+    try {
+      const storedFavorites = localStorage.getItem(LOCAL_STORAGE_FAVORITES_KEY);
+      if (storedFavorites) {
+        const parsed = JSON.parse(storedFavorites);
+        if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+          setFavorites(parsed as FavoritesMap);
+        } else {
+          localStorage.removeItem(LOCAL_STORAGE_FAVORITES_KEY);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load favorites:", err);
+      localStorage.removeItem(LOCAL_STORAGE_FAVORITES_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LOCAL_STORAGE_FAVORITES_KEY, JSON.stringify(favorites));
+    } catch (err) {
+      console.error("Failed to save favorites:", err);
+      toast({ variant: "destructive", title: "Storage Error", description: "Failed to save favorites" });
+    }
+  }, [favorites, toast]);
+
+  // --- Favorites Handlers ---
+  const toggleFavorite = useCallback((post: RedditPost) => {
+    setFavorites(currentFavorites => {
+      const newFavorites = { ...currentFavorites };
+      if (!currentFavorites[post.postId]) {
+        // Add to favorites
+        newFavorites[post.postId] = {
+          postId: post.postId,
+          title: post.title,
+          subreddit: post.subreddit,
+          thumbnailUrl: post.mediaUrls?.[0]
+        };
+        toast({ description: "Added to favorites" });
+      } else {
+        // Remove from favorites
+        delete newFavorites[post.postId];
+        toast({ description: "Removed from favorites" });
+      }
+      return newFavorites;
+    });
+  }, [toast]);
+
   // --- Infinite Scroll ---
   const observer = useRef<IntersectionObserver>();
   const loadMorePostsRef = useRef<() => Promise<void>>();
   const lastPostRef = useCallback(
     (node: HTMLDivElement | null) => {
-      if (isLoading) return;
+      if (isLoading || showFavoritesOnly) return; // Don't observe when showing favorites
       if (observer.current) observer.current.disconnect();
       observer.current = new IntersectionObserver(entries => {
         if (entries[0]?.isIntersecting && hasMore && fetchInitiated) { loadMorePostsRef.current?.(); }
       }, { threshold: 0.5 });
       if (node) observer.current.observe(node);
-    }, [isLoading, hasMore, fetchInitiated] );
+    }, [isLoading, hasMore, fetchInitiated, showFavoritesOnly]);
 
    // --- Data Fetching (with Caching) ---
    const performFetch = useCallback(async (
@@ -407,9 +492,10 @@ export default function Home() {
       return { groupedPosts, updatedAfterTokens: finalUpdatedTokens, anyHasMore };
 
     } catch (e) { if (e instanceof Error) { throw e; } else { throw new Error('An unexpected error occurred during the fetch process.'); } }
-   }, [apiCache, toast, generateCacheKey]); // Added generateCacheKey dependency
+   }, [apiCache, toast, generateCacheKey]);
 
    const fetchInitialPosts = useCallback(async () => {
+     setShowFavoritesOnly(false); // Reset favorites filter when fetching new posts
      let subsToUse = parseSubreddits(subredditInput);
      if (subsToUse.length === 0) {
         setError("Please enter at least one valid subreddit name.");
@@ -440,7 +526,7 @@ export default function Home() {
          else { setError('An unknown error occurred during the initial fetch.'); }
          setHasMore(false); setPosts([]);
      } finally { setIsLoading(false); }
-   }, [subredditInput, sortType, timeFrame, toast, performFetch, apiCache, generateCacheKey]); // Added generateCacheKey
+   }, [subredditInput, sortType, timeFrame, toast, performFetch, apiCache, generateCacheKey]);
 
    const loadMorePosts = useCallback(async () => {
      if (isLoading || !hasMore || !fetchInitiated) return;
@@ -460,14 +546,13 @@ export default function Home() {
          else { setError('An unknown error occurred while loading more posts.'); }
          setHasMore(false);
      } finally { setIsLoading(false); }
-   }, [isLoading, hasMore, fetchInitiated, afterTokens, subredditInput, sortType, timeFrame, toast, performFetch, apiCache]); // Removed generateCacheKey (not directly used here)
+   }, [isLoading, hasMore, fetchInitiated, afterTokens, subredditInput, sortType, timeFrame, toast, performFetch, apiCache]);
 
    useEffect(() => { loadMorePostsRef.current = loadMorePosts; }, [loadMorePosts]);
 
    // --- Scroll Listener Effect for Scroll-to-Top Button ---
   useEffect(() => {
     const checkScrollTop = () => {
-      // Show button if scrolled down more than (e.g.) 400px
       if (!showScrollTop && window.scrollY > 400) {
         setShowScrollTop(true);
       } else if (showScrollTop && window.scrollY <= 400) {
@@ -476,7 +561,6 @@ export default function Home() {
     };
 
     window.addEventListener('scroll', checkScrollTop);
-    // Cleanup function to remove listener when component unmounts
     return () => window.removeEventListener('scroll', checkScrollTop);
   }, [showScrollTop]);
 
@@ -497,7 +581,7 @@ export default function Home() {
    const handleLoadList = useCallback((listName: string) => {
         if (listName && savedLists[listName]) { setSubredditInput(savedLists[listName]); setSelectedListName(listName); setTimeout(() => { fetchInitialPosts(); }, 0); }
         else if (listName === "" || !savedLists[listName]) { setSelectedListName(""); }
-   }, [savedLists, fetchInitialPosts]); // Depends on fetchInitialPosts
+   }, [savedLists, fetchInitialPosts]);
 
    const handleDeleteList = useCallback(() => {
         if (!selectedListName) { toast({ variant: "destructive", description: "No list selected to delete." }); return; }
@@ -511,7 +595,7 @@ export default function Home() {
    const scrollToTop = () => {
     window.scrollTo({
         top: 0,
-        behavior: 'smooth' // Smooth scrolling animation
+        behavior: 'smooth'
     });
 };
 
@@ -569,6 +653,25 @@ export default function Home() {
                         </RadioGroup>
                         {sortType === 'top' && ( <Select value={timeFrame} onValueChange={(value) => {if(!isLoading) setTimeFrame(value as TimeFrame)}} disabled={isLoading} > <SelectTrigger className="w-[180px]" aria-label="Time frame"> <SelectValue placeholder="Time frame" /> </SelectTrigger> <SelectContent> <SelectItem value="day">Today</SelectItem> <SelectItem value="week">This Week</SelectItem> <SelectItem value="month">This Month</SelectItem> <SelectItem value="year">This Year</SelectItem> <SelectItem value="all">All Time</SelectItem> </SelectContent> </Select> )}
                     </div>
+                    {/* Favorites Filter Toggle */}
+                    <div className="flex justify-center pt-2">
+                        <Button
+                            variant={showFavoritesOnly ? "default" : "outline"}
+                            size="sm"
+                            className={cn(
+                                "text-sm active:scale-95 transition-transform",
+                                showFavoritesOnly && "bg-pink-600 hover:bg-pink-700"
+                            )}
+                            onClick={() => setShowFavoritesOnly(prev => !prev)}
+                            disabled={isLoading || Object.keys(favorites).length === 0}
+                        >
+                            <Heart className={cn(
+                                "h-4 w-4 mr-2",
+                                showFavoritesOnly && "fill-current"
+                            )} />
+                            {showFavoritesOnly ? "Showing" : "Show"} Favorites ({Object.keys(favorites).length})
+                        </Button>
+                    </div>
                 </CollapsibleContent>
             </Collapsible>
          </div>
@@ -585,17 +688,19 @@ export default function Home() {
             </Masonry>
         )}
         {/* No Posts Message */}
-        {fetchInitiated && posts.length === 0 && !isLoading && !error && ( <p className="text-center text-muted-foreground mt-10">No posts found.</p> )}
+        {fetchInitiated && postsToDisplay.length === 0 && !isLoading && !error && ( <p className="text-center text-muted-foreground mt-10">No posts found.</p> )}
         {/* Posts Grid */}
-        {posts.length > 0 && (
+        {postsToDisplay.length > 0 && (
           <Masonry breakpointCols={breakpointColumnsObj} className="my-masonry-grid flex gap-1.5" columnClassName="my-masonry-grid_column">
-            {posts.map((post) => {
+            {postsToDisplay.map((post) => {
                 const firstUrl=post?.mediaUrls?.[0];
                 const isVideoPost=firstUrl&&firstUrl.endsWith('.mp4');
                 const isGalleryPost=post?.mediaUrls?.length>1;
                 const isUnplayable = post.isUnplayableVideoFormat ?? false;
                 return (
-                <div key={`${post.subreddit}-${post.postId}`} ref={posts[posts.length-1]===post?lastPostRef:null} className="mb-1.5">
+                <div key={`${post.subreddit}-${post.postId}`} 
+                     ref={!showFavoritesOnly && postsToDisplay[postsToDisplay.length-1]===post ? lastPostRef : null} 
+                     className="mb-1.5">
                  <Card onClick={()=> !isUnplayable && handleThumbnailClick(post)}
                        className={cn(
                             "group relative overflow-hidden bg-gray-100 dark:bg-gray-800 flex items-center justify-center transition-all duration-200",
@@ -603,6 +708,19 @@ export default function Home() {
                             isUnplayable && "cursor-default"
                        )}>
                      {/* Indicators */}
+                     <div className="absolute top-1 left-1 z-20">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 rounded-full bg-black/40 text-white hover:bg-black/60 hover:text-white active:scale-90"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(post);
+                          }}
+                        >
+                          <Heart className={cn("h-4 w-4", favorites[post.postId] ? "fill-current" : "")} />
+                        </Button>
+                     </div>
                      {(isVideoPost || isGalleryPost || isUnplayable) && (
                         <div className="absolute top-1 right-1 z-20 p-1 rounded-full bg-black/40 text-white transition-opacity opacity-70 group-hover:opacity-100">
                             {isUnplayable ? <Video className="h-3 w-3 opacity-70"/> :
@@ -614,6 +732,7 @@ export default function Home() {
                      <MediaCarousel
                         mediaUrls={post.mediaUrls} title={post.title} subreddit={post.subreddit}
                         postId={post.postId} isUnplayableVideoFormat={isUnplayable}
+                        onToggleFavorite={() => toggleFavorite(post)} isFavorite={!!favorites[post.postId]}
                      />
                  </Card>
                 </div>);
@@ -621,19 +740,23 @@ export default function Home() {
            </Masonry>
         )}
         {/* Loading More Indicator */}
-        {isLoading && posts.length > 0 && ( <div className="flex justify-center items-center gap-2 text-center mt-6 p-4 text-muted-foreground"> <Loader2 className="h-4 w-4 animate-spin" /> Loading more... </div> )}
+        {isLoading && postsToDisplay.length > 0 && !showFavoritesOnly && (
+          <div className="flex justify-center items-center gap-2 text-center mt-6 p-4 text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading more...
+          </div>
+        )}
         {/* End Reached Message */}
-        {!hasMore && fetchInitiated && posts.length > 0 && ( <p className="text-center mt-6 p-4 text-muted-foreground">You've reached the end!</p> )}
+        {!hasMore && fetchInitiated && postsToDisplay.length > 0 && !showFavoritesOnly && (
+          <p className="text-center mt-6 p-4 text-muted-foreground">You've reached the end!</p>
+        )}
       </main>
        {/* --- Scroll-to-Top Button --- */}
-      {/* Render button conditionally based on state */}
       {showScrollTop && (
           <Button
              onClick={scrollToTop}
-             variant="secondary" // Or outline/ghost
+             variant="secondary"
              size="icon"
              aria-label="Scroll to top"
-             // Fixed position, bottom-right corner with margin, high z-index
              className="fixed bottom-4 right-4 z-50 h-10 w-10 rounded-full shadow-md active:scale-90 transition-all duration-200"
            >
               <ArrowUp className="h-5 w-5" />
@@ -641,10 +764,8 @@ export default function Home() {
       )}
 
       {/* Fullscreen Dialog */}
-      {/* *** DIALOG UPDATED: Removed DialogClose button from here *** */}
       <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
         <DialogContent className="max-w-none w-[95vw] h-[95vh] p-0 bg-transparent border-none overflow-hidden flex items-center justify-center">
-           {/* Inner wrapper for background, padding, backdrop */}
            <div className="relative w-full h-full flex items-center justify-center bg-black/90 backdrop-blur-sm p-1 sm:p-2">
               <DialogTitle className="sr-only"> Expanded view: {selectedPost?.title || 'Reddit Post'} </DialogTitle>
               <DialogDescription className="sr-only"> Expanded view of Reddit post: {selectedPost?.title || 'Content'}... </DialogDescription>
@@ -652,15 +773,15 @@ export default function Home() {
                  <MediaCarousel
                     mediaUrls={selectedPost.mediaUrls} title={selectedPost.title}
                     subreddit={selectedPost.subreddit} postId={selectedPost.postId}
-                    isFullScreen={true} // Explicitly set isFullScreen
+                    isFullScreen={true}
                     isUnplayableVideoFormat={selectedPost.isUnplayableVideoFormat ?? false}
+                    onToggleFavorite={() => toggleFavorite(selectedPost)}
+                    isFavorite={!!favorites[selectedPost.postId]}
                  />
               ) : ( <div className="text-white text-xl">Loading content...</div> )}
-              {/* NO DialogClose button here anymore - it's inside MediaCarousel */}
            </div>
         </DialogContent>
       </Dialog>
-      {/* *** END DIALOG UPDATE *** */}
 
       {/* Footer */}
       <footer className="mt-16 md:mt-24 text-center text-sm text-muted-foreground flex-shrink-0 pb-6">
