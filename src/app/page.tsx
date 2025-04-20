@@ -336,9 +336,31 @@ export default function Home() {
 
   useEffect(() => {
     if (Object.keys(savedLists).length > 0) {
-         try { localStorage.setItem(LOCAL_STORAGE_SAVED_LISTS_KEY, JSON.stringify(savedLists)); }
-         catch (err) { console.error("Failed to save lists:", err); toast({ variant: "destructive", title: "Storage Error" }); }
-    } else { localStorage.removeItem(LOCAL_STORAGE_SAVED_LISTS_KEY); }
+      try {
+        localStorage.setItem(LOCAL_STORAGE_SAVED_LISTS_KEY, JSON.stringify(savedLists));
+      } catch (err) {
+        console.error("Failed to save lists:", err);
+        if (err instanceof DOMException && (err.name === 'QuotaExceededError' || err.code === 22)) {
+          toast({ 
+            variant: "destructive", 
+            title: "Storage Full",
+            description: "Cannot save list. Local storage limit reached." 
+          });
+        } else {
+          toast({ 
+            variant: "destructive", 
+            title: "Save Error",
+            description: "Failed to save lists to storage." 
+          });
+        }
+      }
+    } else {
+      try {
+        localStorage.removeItem(LOCAL_STORAGE_SAVED_LISTS_KEY);
+      } catch (err) {
+        console.error("Failed to remove lists:", err);
+      }
+    }
   }, [savedLists, toast]);
 
   // --- Load/Save Favorites ---
@@ -360,11 +382,31 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_FAVORITES_KEY, JSON.stringify(favorites));
-    } catch (err) {
-      console.error("Failed to save favorites:", err);
-      toast({ variant: "destructive", title: "Storage Error", description: "Failed to save favorites" });
+    if (Object.keys(favorites).length > 0) {
+      try {
+        localStorage.setItem(LOCAL_STORAGE_FAVORITES_KEY, JSON.stringify(favorites));
+      } catch (err) {
+        console.error("Failed to save favorites:", err);
+        if (err instanceof DOMException && (err.name === 'QuotaExceededError' || err.code === 22)) {
+          toast({ 
+            variant: "destructive", 
+            title: "Storage Full",
+            description: "Cannot save favorites. Local storage limit reached." 
+          });
+        } else {
+          toast({ 
+            variant: "destructive", 
+            title: "Save Error",
+            description: "Failed to save favorites to storage." 
+          });
+        }
+      }
+    } else {
+      try {
+        localStorage.removeItem(LOCAL_STORAGE_FAVORITES_KEY);
+      } catch (err) {
+        console.error("Failed to remove favorites:", err);
+      }
     }
   }, [favorites, toast]);
 
