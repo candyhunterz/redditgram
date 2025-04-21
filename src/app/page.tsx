@@ -807,12 +807,19 @@ export default function Home() {
 
       {/* Fullscreen Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
+        {/* Keep DialogContent itself without padding if needed */}
         <DialogContent className="max-w-none w-[95vw] h-[95vh] p-0 bg-transparent border-none overflow-hidden flex items-center justify-center">
-           <div className="relative w-full h-full flex items-center justify-center bg-black/90 backdrop-blur-sm p-1 sm:p-2">
+
+           {/* *** MODIFIED: Added padding (e.g., p-4) to this inner wrapper *** */}
+           <div className="relative w-full h-full flex items-center justify-center bg-black/90 backdrop-blur-sm p-6">
+              {/* --- Content Starts Below --- */}
+
               <DialogTitle className="sr-only"> Expanded view: {selectedPost?.title || 'Reddit Post'} </DialogTitle>
               <DialogDescription className="sr-only"> Expanded view of Reddit post: {selectedPost?.title || 'Content'}... </DialogDescription>
+
               {selectedPost ? (
                  <MediaCarousel
+                    // Pass props down as before
                     mediaUrls={selectedPost.mediaUrls} title={selectedPost.title}
                     subreddit={selectedPost.subreddit} postId={selectedPost.postId}
                     isFullScreen={true}
@@ -821,7 +828,12 @@ export default function Home() {
                     isFavorite={!!favorites[selectedPost.postId]}
                  />
               ) : ( <div className="text-white text-xl">Loading content...</div> )}
+
+              {/* The Close Button is now rendered INSIDE MediaCarousel */}
+
+              {/* --- Content Ends Above --- */}
            </div>
+           {/* *** End Inner Wrapper *** */}
         </DialogContent>
       </Dialog>
 
