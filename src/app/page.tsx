@@ -811,7 +811,7 @@ export default function Home() {
         <DialogContent className="max-w-none w-[95vw] h-[95vh] p-0 bg-transparent border-none overflow-hidden flex items-center justify-center">
 
            {/* *** MODIFIED: Added padding (e.g., p-4) to this inner wrapper *** */}
-           <div className="relative w-full h-full flex items-center justify-center bg-black/90 backdrop-blur-sm p-6">
+           <div className="relative w-full h-full flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
               {/* --- Content Starts Below --- */}
 
               <DialogTitle className="sr-only"> Expanded view: {selectedPost?.title || 'Reddit Post'} </DialogTitle>
