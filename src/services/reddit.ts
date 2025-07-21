@@ -145,21 +145,22 @@ export async function getPosts(
         throw new Error("TimeFrame ('day', 'week', 'month', 'year', 'all') is required when using sortType 'top'.");
     }
 
-    try {
-        const params = new URLSearchParams({
-            subreddit,
-            sortType,
-            limit: limit.toString(),
-            raw_json: '1',
-        });
-        if (sortType === 'top' && timeFrame) {
-            params.append('timeFrame', timeFrame);
-        }
-        if (after) {
-            params.append('after', after);
-        }
+    const params = new URLSearchParams({
+        subreddit,
+        sortType,
+        limit: limit.toString(),
+        raw_json: '1',
+    });
+    if (sortType === 'top' && timeFrame) {
+        params.append('timeFrame', timeFrame);
+    }
+    if (after) {
+        params.append('after', after);
+    }
+    const url = `/api/reddit?${params.toString()}`;
 
-        const response = await fetch(`/api/reddit?${params.toString()}`, { cache: 'no-store' });
+    try {
+        const response = await fetch(url, { cache: 'no-store' });
 
         if (!response.ok) {
             let errorData = null;
