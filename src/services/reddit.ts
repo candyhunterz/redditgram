@@ -146,11 +146,20 @@ export async function getPosts(
     }
 
     try {
-        let url = `https://www.reddit.com/r/${subreddit}/${sortType}.json?limit=${limit}&raw_json=1`;
-        if (sortType === 'top' && timeFrame) { url += `&t=${timeFrame}`; }
-        if (after) { url += `&after=${after}`; }
+        const params = new URLSearchParams({
+            subreddit,
+            sortType,
+            limit: limit.toString(),
+            raw_json: '1',
+        });
+        if (sortType === 'top' && timeFrame) {
+            params.append('timeFrame', timeFrame);
+        }
+        if (after) {
+            params.append('after', after);
+        }
 
-        const response = await fetch(url, { cache: 'no-store' });
+        const response = await fetch(`/api/reddit?${params.toString()}`, { cache: 'no-store' });
 
         if (!response.ok) {
             let errorData = null;
