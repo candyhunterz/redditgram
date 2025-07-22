@@ -129,7 +129,8 @@ export async function GET(request: NextRequest) {
         if (after) { url += `&after=${after}`; }
 
         // --- Make the server-to-server request to Reddit with User-Agent ---
-        const userAgent = 'web:app.redditgram:v1.0.0 (by /u/candyhunterz)';
+        const redditUsername = process.env.REDDIT_USERNAME || 'default_user';
+    	const userAgent = `web:app.redditgram:v1.0.0 (by /u/${redditUsername})`;
         const redditResponse = await fetch(url, {
             headers: { 'User-Agent': userAgent },
             // Optional: Configure server-side caching
