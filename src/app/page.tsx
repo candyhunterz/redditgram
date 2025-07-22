@@ -524,7 +524,7 @@ export default function Home() {
             }
         });
 
-       if (overallError && successfulResults.length === 0) throw new Error(`All subreddit fetches failed. First error:`);
+       if (overallError && successfulResults.length === 0) throw new Error(`All subreddit fetches failed. First error: ${overallError}`);
        else if (overallError) toast({ variant: "destructive", title: "Fetch Warning", description: `Could not load some subreddits. Check console.`});
 
       const groupedPosts = successfulResults.map(res => res.posts);
