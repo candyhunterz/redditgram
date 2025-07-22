@@ -18,18 +18,17 @@ export type TimeFrame = 'day' | 'week' | 'month' | 'year' | 'all';
 
 
 // ========================================================================
-// 2. HELPER FUNCTION (Copied directly from your reddit.ts)
+// 2. MEDIA EXTRACTION HELPER FUNCTION
+// (This is your exact logic from your reddit.ts file)
 // ========================================================================
 
 const extractMediaUrls = (postDetail: any): string[] => {
     if (!postDetail) return [];
 
     const urls: string[] = [];
-    let extracted = false; // Use a single flag
+    let extracted = false;
 
     try {
-        // --- Check Order (Most specific/reliable first) ---
-
         // 1. Gallery
         if (postDetail.is_gallery && postDetail.gallery_data?.items && postDetail.media_metadata) {
             for (const item of postDetail.gallery_data.items) {
@@ -37,66 +36,60 @@ const extractMediaUrls = (postDetail: any): string[] => {
                 const mediaMeta = postDetail.media_metadata[mediaId];
                 if (!mediaMeta) continue;
                 let bestUrl = '';
-                // Prefer highest resolution preview, then source
                 if (mediaMeta.p && mediaMeta.p.length > 0) bestUrl = mediaMeta.p[mediaMeta.p.length - 1]?.u;
                 if (!bestUrl && mediaMeta.s?.u) bestUrl = mediaMeta.s.u;
-                if (bestUrl) urls.push(bestUrl); // raw_json=1 handles unescaping
+                if (bestUrl) urls.push(bestUrl);
             }
             if (urls.length > 0) extracted = true;
         }
 
-        // 2. Reddit Video (Primary Check - using fallback_url)
+        // 2. Reddit Video
         const redditVideo = postDetail.media?.reddit_video || postDetail.secure_media?.reddit_video;
         if (!extracted && redditVideo?.fallback_url) {
-            // Check if fallback_url looks like a direct MP4 and NOT a manifest URL
             if (redditVideo.fallback_url.includes('.mp4') && !redditVideo.fallback_url.includes('DASHPlaylist.mpd') && !redditVideo.fallback_url.includes('.m3u8')) {
                  urls.push(redditVideo.fallback_url);
                  extracted = true;
             }
         }
 
-        // 3. Reddit Video Preview (Often GIFs/MP4s, check if no primary video/gallery)
+        // 3. Reddit Video Preview
         if (!extracted && postDetail.preview?.reddit_video_preview?.fallback_url) {
             urls.push(postDetail.preview.reddit_video_preview.fallback_url);
             extracted = true;
         }
 
-        // 4. Direct Image/GIF URL (Check overridden first)
+        // 4. Direct Image/GIF URL
         const finalUrl = postDetail.url_overridden_by_dest || postDetail.url;
         if (!extracted && finalUrl) {
              const lowerUrl = finalUrl.toLowerCase();
-             // Add check for webp as well
              if (lowerUrl.endsWith('.jpg') || lowerUrl.endsWith('.jpeg') || lowerUrl.endsWith('.png') || lowerUrl.endsWith('.gif') || lowerUrl.endsWith('.webp')) {
                 urls.push(finalUrl);
                 extracted = true;
              }
         }
 
-        // --- Fallbacks (If NOTHING usable found yet) ---
-
-        // 5. oEmbed Thumbnail (For external videos - use as image)
+        // 5. oEmbed Thumbnail (Fallback)
         const oEmbed = postDetail.media?.oembed || postDetail.secure_media?.oembed;
         if (!extracted && oEmbed?.thumbnail_url) {
              const thumbLower = oEmbed.thumbnail_url.toLowerCase();
              if (thumbLower.includes('.jpg') || thumbLower.includes('.png') || thumbLower.includes('.jpeg')) {
                  urls.push(oEmbed.thumbnail_url);
-                 extracted = true; // Treat thumbnail as extracted media for the grid
+                 extracted = true;
              }
         }
 
-        // 6. **Primary Preview Image (BEST FALLBACK)**
+        // 6. Primary Preview Image (Best Fallback)
         if (!extracted && postDetail.preview?.images?.[0]?.source?.url) {
              urls.push(postDetail.preview.images[0].source.url);
              extracted = true;
         }
 
-        // --- Logging for posts that were marked is_video but we couldn't use ---
         if (postDetail.is_video && urls.length === 0) {
-             console.warn(`Post ${postDetail.id} in r/${postDetail.subreddit} (is_video=true) - No usable direct media URL found (likely DASH/HLS only).`);
+             console.warn(`Post ${postDetail.id} in r/${postDetail.subreddit} (is_video=true) - No usable direct media URL found.`);
         }
 
     } catch (mediaError) {
-        console.error(`Error during media extraction for post ${postDetail?.id}:`, mediaError, postDetail);
+        console.error(`Error during media extraction for post ${postDetail?.id}:`, mediaError);
     }
     return urls;
 };
@@ -114,7 +107,6 @@ export async function GET(request: NextRequest) {
     const after = searchParams.get('after');
     const limit = searchParams.get('limit') || '20';
 
-    // --- Input validation ---
     if (!subreddit || !sortType) {
         return NextResponse.json({ error: 'Missing required parameters: subreddit and sortType' }, { status: 400 });
     }
@@ -123,35 +115,39 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        // --- Build the Reddit API URL ---
         let url = `https://www.reddit.com/r/${subreddit}/${sortType}.json?limit=${limit}&raw_json=1`;
         if (sortType === 'top' && timeFrame) { url += `&t=${timeFrame}`; }
         if (after) { url += `&after=${after}`; }
 
-        // --- Make the server-to-server request to Reddit with User-Agent ---
         const redditUsername = process.env.REDDIT_USERNAME || 'default_user';
-    	const userAgent = `web:app.redditgram:v1.0.0 (by /u/${redditUsername})`;
+        const userAgent = `web:app.redditgram:v1.0.0 (by /u/${redditUsername})`;
+
+        // ===================================================================
+        // ★★★ ESSENTIAL DIAGNOSTIC LOGGING ★★★
+        // This will appear in your Vercel logs so you can see the exact User-Agent.
+        console.log(`[DIAGNOSTIC_LOG] Preparing to fetch from Reddit. URL: ${url}`);
+        console.log(`[DIAGNOSTIC_LOG] Using User-Agent: "${userAgent}"`);
+        // ===================================================================
+
         const redditResponse = await fetch(url, {
             headers: { 'User-Agent': userAgent },
-            // Optional: Configure server-side caching
-            next: { revalidate: 300 } // Revalidate cache every 5 minutes
+            next: { revalidate: 300 } // Server-side cache for 5 minutes
         });
 
-        // --- Handle Reddit API errors ---
         if (!redditResponse.ok) {
-            const errorText = `Reddit API Error: ${redditResponse.status} ${redditResponse.statusText}`;
-            console.error(errorText, await redditResponse.text());
-            return NextResponse.json({ error: errorText }, { status: redditResponse.status });
+            const errorDetails = await redditResponse.text();
+            console.error(`[REDDIT_API_ERROR] Status: ${redditResponse.status}. Details: ${errorDetails}`);
+            // Forward a structured error to the client
+            return NextResponse.json({ error: `Reddit API Error: ${redditResponse.status} Blocked` }, { status: redditResponse.status });
         }
 
         const data = await redditResponse.json();
 
         if (!data?.data?.children) {
-            console.warn(`No data or unexpected structure received from ${url}:`, data);
             return NextResponse.json({ posts: [], after: null });
         }
 
-        // --- Process the data using your original logic ---
+        // --- Process posts using your original logic ---
         const posts: RedditPost[] = data.data.children
             .map((child: any): RedditPost | null => {
                 let postData = child?.data;
@@ -215,7 +211,7 @@ export async function GET(request: NextRequest) {
         });
 
     } catch (error: any) {
-        console.error(`[API ROUTE HANDLER ERROR] /r/${subreddit}:`, error);
+        console.error(`[GLOBAL_HANDLER_ERROR] An unexpected error occurred:`, error);
         return NextResponse.json({ error: `An internal server error occurred: ${error.message}` }, { status: 500 });
     }
 }
