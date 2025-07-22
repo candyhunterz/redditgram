@@ -150,7 +150,13 @@ export async function getPosts(
         if (sortType === 'top' && timeFrame) { url += `&t=${timeFrame}`; }
         if (after) { url += `&after=${after}`; }
 
-        const response = await fetch(url, { cache: 'no-store' });
+        // IMPORTANT: Replace with your actual Reddit username.
+        const userAgent = 'web:app.redditgram:v1.0.0 (by /u/candyhunterz)';
+
+        const response = await fetch(url, {
+            cache: 'no-store',
+            headers: { 'User-Agent': userAgent }
+        });
 
         if (!response.ok) {
             let errorData = null;
