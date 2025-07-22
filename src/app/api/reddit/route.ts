@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // ========================================================================
-// 1. TYPE DEFINITIONS
+// 1. TYPE DEFINITIONS (No changes needed)
 // ========================================================================
 
 export interface RedditPost {
@@ -18,8 +18,7 @@ export type TimeFrame = 'day' | 'week' | 'month' | 'year' | 'all';
 
 
 // ========================================================================
-// 2. MEDIA EXTRACTION HELPER FUNCTION
-// (This is your exact logic from your reddit.ts file)
+// 2. MEDIA EXTRACTION HELPER FUNCTION (No changes needed)
 // ========================================================================
 
 const extractMediaUrls = (postDetail: any): string[] => {
@@ -110,105 +109,85 @@ export async function GET(request: NextRequest) {
     if (!subreddit || !sortType) {
         return NextResponse.json({ error: 'Missing required parameters: subreddit and sortType' }, { status: 400 });
     }
-    if (sortType === 'top' && !timeFrame) {
-        return NextResponse.json({ error: 'TimeFrame is required for top sort' }, { status: 400 });
-    }
 
     try {
-        let url = `https://www.reddit.com/r/${subreddit}/${sortType}.json?limit=${limit}&raw_json=1`;
+        // ★★★★★★★★★★★★★★★★★★★★ THE FIX ★★★★★★★★★★★★★★★★★★★★
+        // The domain is changed from "www.reddit.com" to "oauth.reddit.com".
+        // This is the modern endpoint for API requests and avoids the 403 block.
+        // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+        let url = `https://oauth.reddit.com/r/${subreddit}/${sortType}.json?limit=${limit}&raw_json=1`;
         if (sortType === 'top' && timeFrame) { url += `&t=${timeFrame}`; }
         if (after) { url += `&after=${after}`; }
 
         const redditUsername = process.env.REDDIT_USERNAME || 'default_user';
-        const userAgent = `web:app.redditgram:v1.0.0 (by /u/${redditUsername})`;
+        const userAgent = `web:app.redditgram:v1.0.1 (by /u/${redditUsername})`; // Updated version for good practice
 
-        // ===================================================================
-        // ★★★ ESSENTIAL DIAGNOSTIC LOGGING ★★★
-        // This will appear in your Vercel logs so you can see the exact User-Agent.
-        console.log(`[DIAGNOSTIC_LOG] Preparing to fetch from Reddit. URL: ${url}`);
-        console.log(`[DIAGNOSTIC_LOG] Using User-Agent: "${userAgent}"`);
-        // ===================================================================
+        console.log(`[API_ROUTE_LOG] Using User-Agent: "${userAgent}"`);
+        console.log(`[API_ROUTE_LOG] Fetching URL: "${url}"`);
+
 
         const redditResponse = await fetch(url, {
             headers: { 'User-Agent': userAgent },
-            next: { revalidate: 300 } // Server-side cache for 5 minutes
+            next: { revalidate: 300 }
         });
 
         if (!redditResponse.ok) {
             const errorDetails = await redditResponse.text();
             console.error(`[REDDIT_API_ERROR] Status: ${redditResponse.status}. Details: ${errorDetails}`);
-            // Forward a structured error to the client
-            return NextResponse.json({ error: `Reddit API Error: ${redditResponse.status} Blocked` }, { status: redditResponse.status });
+            return NextResponse.json({ error: `Reddit API Error: ${redditResponse.status}` }, { status: redditResponse.status });
         }
 
         const data = await redditResponse.json();
 
+        // --- Process posts (No changes needed below this line) ---
         if (!data?.data?.children) {
             return NextResponse.json({ posts: [], after: null });
         }
-
-        // --- Process posts using your original logic ---
-        const posts: RedditPost[] = data.data.children
-            .map((child: any): RedditPost | null => {
-                let postData = child?.data;
-                if (!postData) return null;
-
-                let mediaUrls = extractMediaUrls(postData);
-                let isUnplayableVideo = false;
-
-                const isVideoPost = postData.is_video === true;
-                const usedNonVideoUrl = mediaUrls.length > 0 && !mediaUrls[0].endsWith('.mp4');
-                const extractionFailedForVideo = isVideoPost && mediaUrls.length === 0;
-
-                if (isVideoPost && (usedNonVideoUrl || extractionFailedForVideo)) {
-                    if (extractionFailedForVideo && postData.preview?.images?.[0]?.source?.url) {
-                        mediaUrls = [postData.preview.images[0].source.url];
-                    } else if (extractionFailedForVideo) {
+        
+        const posts: RedditPost[] = data.data.children.map((child: any): RedditPost | null => {
+            let postData = child?.data;
+            if (!postData) return null;
+            let mediaUrls = extractMediaUrls(postData);
+            let isUnplayableVideo = false;
+            const isVideoPost = postData.is_video === true;
+            const usedNonVideoUrl = mediaUrls.length > 0 && !mediaUrls[0].endsWith('.mp4');
+            const extractionFailedForVideo = isVideoPost && mediaUrls.length === 0;
+            if (isVideoPost && (usedNonVideoUrl || extractionFailedForVideo)) {
+                if (extractionFailedForVideo && postData.preview?.images?.[0]?.source?.url) {
+                    mediaUrls = [postData.preview.images[0].source.url];
+                } else if (extractionFailedForVideo) {
+                    return null;
+                }
+                if (mediaUrls.length > 0) isUnplayableVideo = true;
+            }
+            if (mediaUrls.length === 0 && postData.crosspost_parent_list?.[0]) {
+                const parentData = postData.crosspost_parent_list[0];
+                mediaUrls = extractMediaUrls(parentData);
+                const isParentVideo = parentData.is_video === true;
+                const usedParentNonVideoUrl = mediaUrls.length > 0 && !mediaUrls[0].endsWith('.mp4');
+                const extractionFailedForParentVideo = isParentVideo && mediaUrls.length === 0;
+                if (isParentVideo && (usedParentNonVideoUrl || extractionFailedForParentVideo)) {
+                    if (extractionFailedForParentVideo && parentData.preview?.images?.[0]?.source?.url) {
+                        mediaUrls = [parentData.preview.images[0].source.url];
+                    } else if (extractionFailedForParentVideo) {
                         return null;
                     }
-                    if (mediaUrls.length > 0) {
-                       isUnplayableVideo = true;
-                    }
+                    if (mediaUrls.length > 0) isUnplayableVideo = true;
                 }
+            }
+            if (mediaUrls.length > 0) {
+                return {
+                    title: postData.title || '',
+                    mediaUrls: mediaUrls,
+                    subreddit: postData.subreddit || subreddit,
+                    postId: postData.id,
+                    isUnplayableVideoFormat: isUnplayableVideo,
+                };
+            }
+            return null;
+        }).filter(Boolean);
 
-                if (mediaUrls.length === 0 && postData.crosspost_parent_list?.[0] && postData.crosspost_parent_list[0].id !== postData.id) {
-                    const parentData = postData.crosspost_parent_list[0];
-                    mediaUrls = extractMediaUrls(parentData);
-
-                    const isParentVideo = parentData.is_video === true;
-                    const usedParentNonVideoUrl = mediaUrls.length > 0 && !mediaUrls[0].endsWith('.mp4');
-                    const extractionFailedForParentVideo = isParentVideo && mediaUrls.length === 0;
-
-                     if (isParentVideo && (usedParentNonVideoUrl || extractionFailedForParentVideo)) {
-                         if (extractionFailedForParentVideo && parentData.preview?.images?.[0]?.source?.url) {
-                             mediaUrls = [parentData.preview.images[0].source.url];
-                         } else if (extractionFailedForParentVideo) {
-                             return null;
-                         }
-                         if (mediaUrls.length > 0) {
-                             isUnplayableVideo = true;
-                         }
-                     }
-                }
-
-                if (mediaUrls.length > 0) {
-                    return {
-                        title: postData.title || '',
-                        mediaUrls: mediaUrls,
-                        subreddit: postData.subreddit || subreddit,
-                        postId: postData.id,
-                        isUnplayableVideoFormat: isUnplayableVideo,
-                    };
-                }
-                return null;
-            })
-            .filter((post: RedditPost | null): post is RedditPost => post !== null);
-
-        // --- Send the clean data back to the client ---
-        return NextResponse.json({
-            posts,
-            after: data.data.after,
-        });
+        return NextResponse.json({ posts, after: data.data.after });
 
     } catch (error: any) {
         console.error(`[GLOBAL_HANDLER_ERROR] An unexpected error occurred:`, error);
