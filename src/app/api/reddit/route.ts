@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // ========================================================================
-// 1. TYPE DEFINITIONS (No changes needed)
+// 1. TYPE DEFINITIONS
 // ========================================================================
 
 export interface RedditPost {
@@ -18,7 +18,7 @@ export type TimeFrame = 'day' | 'week' | 'month' | 'year' | 'all';
 
 
 // ========================================================================
-// 2. MEDIA EXTRACTION HELPER FUNCTION (No changes needed)
+// 2. MEDIA EXTRACTION HELPER FUNCTION
 // ========================================================================
 
 const extractMediaUrls = (postDetail: any): string[] => {
@@ -109,22 +109,41 @@ export async function GET(request: NextRequest) {
     if (!subreddit || !sortType) {
         return NextResponse.json({ error: 'Missing required parameters: subreddit and sortType' }, { status: 400 });
     }
+    if (sortType === 'top' && !timeFrame) {
+        return NextResponse.json({ error: 'TimeFrame is required for top sort' }, { status: 400 });
+    }
 
     try {
-        // ★★★★★★★★★★★★★★★★★★★★ THE FIX ★★★★★★★★★★★★★★★★★★★★
-        // The domain is changed from "www.reddit.com" to "oauth.reddit.com".
-        // This is the modern endpoint for API requests and avoids the 403 block.
-        // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+        // --- IP DETECTION LOGIC ---
+        // This block finds the server's public IP address before making the request.
+        let serverIp = 'unknown';
+        try {
+            // We use an external service to tell us our own IP.
+            // 'no-store' is important to prevent caching of the IP address.
+            const ipResponse = await fetch('https://api.ipify.org?format=json', { cache: 'no-store' });
+            if (ipResponse.ok) {
+                const ipData = await ipResponse.json();
+                serverIp = ipData.ip;
+            }
+        } catch (ipError) {
+            console.error("[IP_DETECTION_ERROR] Could not fetch server IP address:", ipError);
+        }
+        // --- END IP DETECTION ---
+
+        // Build the URL using the correct oauth.reddit.com domain
         let url = `https://oauth.reddit.com/r/${subreddit}/${sortType}.json?limit=${limit}&raw_json=1`;
         if (sortType === 'top' && timeFrame) { url += `&t=${timeFrame}`; }
         if (after) { url += `&after=${after}`; }
 
         const redditUsername = process.env.REDDIT_USERNAME || 'default_user';
-        const userAgent = `web:app.redditgram:v1.0.1 (by /u/${redditUsername})`; // Updated version for good practice
+        const userAgent = `web:app.redditgram:v1.0.1 (by /u/${redditUsername})`;
 
-        console.log(`[API_ROUTE_LOG] Using User-Agent: "${userAgent}"`);
-        console.log(`[API_ROUTE_LOG] Fetching URL: "${url}"`);
-
+        // --- DIAGNOSTIC LOGGING ---
+        // This is the information you will provide to Reddit Support.
+        console.log(`[DIAGNOSTIC_LOG] Request from Vercel Server IP: ${serverIp}`);
+        console.log(`[DIAGNOSTIC_LOG] Using User-Agent: "${userAgent}"`);
+        console.log(`[DIAGNOSTIC_LOG] Fetching URL: "${url}"`);
+        // --- END DIAGNOSTIC LOGGING ---
 
         const redditResponse = await fetch(url, {
             headers: { 'User-Agent': userAgent },
@@ -139,11 +158,10 @@ export async function GET(request: NextRequest) {
 
         const data = await redditResponse.json();
 
-        // --- Process posts (No changes needed below this line) ---
+        // --- Process posts (Your original logic) ---
         if (!data?.data?.children) {
             return NextResponse.json({ posts: [], after: null });
         }
-        
         const posts: RedditPost[] = data.data.children.map((child: any): RedditPost | null => {
             let postData = child?.data;
             if (!postData) return null;
