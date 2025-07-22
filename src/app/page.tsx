@@ -291,12 +291,6 @@ export default function Home() {
   const { toast } = useToast();
 
   // --- Cache ---
-  const apiCache = useRef(new Map<CacheKey, CachedRedditResponse>()).current;
-  const generateCacheKey = ( sub: string, sort: SortType, time?: TimeFrame, after?: string | null ): CacheKey => {
-      const timeKey = sort === 'top' ? (time || 'all') : 'hot';
-      const afterKey = after || 'initial';
-      return `${sub}::${sort}::${timeKey}::${afterKey}`;
-  };
 
   // --- Filtered Posts ---
   const postsToDisplay = useMemo(() => {
@@ -467,42 +461,22 @@ export default function Home() {
 
     for (const sub of subredditsToFetch) {
         const afterParam = currentAfterTokens[sub] ?? undefined;
-        const cacheKey = generateCacheKey(sub, currentSortType, currentSortType === 'top' ? currentTimeFrame : undefined, afterParam);
         subOrderForResults.push(sub);
 
-        if (apiCache.has(cacheKey)) {
-            console.log(`%cCache HIT for key: ${cacheKey}`, 'color: green');
-            const cachedData = apiCache.get(cacheKey)!;
-            const postsWithMetadata = cachedData.posts.map(p => ({
-                ...p,
-                subreddit: sub,
-                isUnplayableVideoFormat: p.isUnplayableVideoFormat ?? false
-            }));
-            fetchPromises.push(Promise.resolve({
-                posts: postsWithMetadata,
-                after: cachedData.after,
-                sub: sub
-            }));
-        } else {
-            console.log(`%cCache MISS for key: ${cacheKey}`, 'color: orange');
-            fetchPromises.push(
-                getPosts(sub, currentSortType, {
-                    timeFrame: currentSortType === 'top' ? currentTimeFrame : undefined,
-                    after: afterParam,
-                    limit: POSTS_PER_LOAD
-                }).then(response => {
-                    const dataToCache: CachedRedditResponse = { posts: response.posts, after: response.after };
-                    apiCache.set(cacheKey, dataToCache);
-                    console.log(`%cStored in cache: ${cacheKey}`, 'color: blue');
-                    const postsWithMetadata = response.posts.map(p => ({
-                        ...p,
-                        subreddit: sub,
-                        isUnplayableVideoFormat: p.isUnplayableVideoFormat ?? false
-                    }));
-                    return { posts: postsWithMetadata, after: response.after, sub: sub };
-                })
-            );
-        }
+        fetchPromises.push(
+            getPosts(sub, currentSortType, {
+                timeFrame: currentSortType === 'top' ? currentTimeFrame : undefined,
+                after: afterParam,
+                limit: POSTS_PER_LOAD
+            }).then(response => {
+                const postsWithMetadata = response.posts.map(p => ({
+                    ...p,
+                    subreddit: sub,
+                    isUnplayableVideoFormat: p.isUnplayableVideoFormat ?? false
+                }));
+                return { posts: postsWithMetadata, after: response.after, sub: sub };
+            })
+        );
     }
 
     try {
@@ -534,7 +508,7 @@ export default function Home() {
       return { groupedPosts, updatedAfterTokens: finalUpdatedTokens, anyHasMore };
 
     } catch (e) { if (e instanceof Error) { throw e; } else { throw new Error('An unexpected error occurred during the fetch process.'); } }
-   }, [apiCache, toast, generateCacheKey]);
+   }, [toast]);
 
    const fetchInitialPosts = useCallback(async () => {
      setShowFavoritesOnly(false); // Reset favorites filter when fetching new posts
@@ -543,15 +517,6 @@ export default function Home() {
         setError("Please enter at least one valid subreddit name.");
         setPosts([]); setFetchInitiated(false); setHasMore(false); return;
      }
-
-     console.log("Clearing initial cache for relevant keys...");
-     subsToUse.forEach(sub => {
-         const initialCacheKey = generateCacheKey(sub, sortType, sortType === 'top' ? timeFrame : undefined, undefined);
-         if (apiCache.has(initialCacheKey)) {
-             apiCache.delete(initialCacheKey);
-             console.log(`%cCleared initial cache key: ${initialCacheKey}`, 'color: red');
-         }
-     });
 
      setIsLoading(true); setError(null); setPosts([]); setAfterTokens({}); setHasMore(true); setFetchInitiated(true);
      try {
@@ -568,7 +533,7 @@ export default function Home() {
          else { setError('An unknown error occurred during the initial fetch.'); }
          setHasMore(false); setPosts([]);
      } finally { setIsLoading(false); }
-   }, [subredditInput, sortType, timeFrame, toast, performFetch, apiCache, generateCacheKey]);
+   }, [subredditInput, sortType, timeFrame, toast, performFetch]);
 
    const loadMorePosts = useCallback(async () => {
      if (isLoading || !hasMore || !fetchInitiated) return;
@@ -588,7 +553,7 @@ export default function Home() {
          else { setError('An unknown error occurred while loading more posts.'); }
          setHasMore(false);
      } finally { setIsLoading(false); }
-   }, [isLoading, hasMore, fetchInitiated, afterTokens, subredditInput, sortType, timeFrame, toast, performFetch, apiCache]);
+   }, [isLoading, hasMore, fetchInitiated, afterTokens, subredditInput, sortType, timeFrame, toast, performFetch]);
 
    useEffect(() => { loadMorePostsRef.current = loadMorePosts; }, [loadMorePosts]);
 
