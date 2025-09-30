@@ -94,17 +94,20 @@ interface MediaCarouselProps {
   isUnplayableVideoFormat?: boolean;
   onToggleFavorite?: () => void;
   isFavorite?: boolean;
+  onClose?: () => void;
 }
 
 const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
     mediaUrls, fullQualityUrls, title, subreddit, postId, isFullScreen = false, isUnplayableVideoFormat = false,
-    onToggleFavorite, isFavorite = false
+    onToggleFavorite, isFavorite = false, onClose
 }) => {
     // --- State and Refs ---
     const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
     const touchStartX = useRef<number | null>(null);
     const touchEndX = useRef<number | null>(null);
+    const touchStartY = useRef<number | null>(null);
+    const touchEndY = useRef<number | null>(null);
     const swipeThreshold = 50;
 
     // --- Derived State & Callbacks ---
@@ -130,18 +133,42 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
 
     // --- Swipe Handlers ---
     const handleTouchStart = (e: React.TouchEvent) => {
-      if (!isFullScreen || !showButtons) return;
-      touchEndX.current = null; touchStartX.current = e.targetTouches[0].clientX;
+      if (!isFullScreen) return;
+      touchEndX.current = null;
+      touchEndY.current = null;
+      touchStartX.current = e.targetTouches[0].clientX;
+      touchStartY.current = e.targetTouches[0].clientY;
     };
     const handleTouchMove = (e: React.TouchEvent) => {
-        if (!touchStartX.current || !isFullScreen || !showButtons) return;
+        if (!touchStartX.current || !touchStartY.current || !isFullScreen) return;
         touchEndX.current = e.targetTouches[0].clientX;
+        touchEndY.current = e.targetTouches[0].clientY;
     };
     const handleTouchEnd = (e: React.TouchEvent) => {
-        if (!touchStartX.current || touchEndX.current === null || !isFullScreen || !showButtons) return;
+        if (!touchStartX.current || !touchStartY.current || touchEndX.current === null || touchEndY.current === null || !isFullScreen) return;
+
         const diffX = touchStartX.current - touchEndX.current;
-        if (Math.abs(diffX) > swipeThreshold) { if (diffX > 0) { nextMedia(); } else { prevMedia(); } }
-        touchStartX.current = null; touchEndX.current = null;
+        const diffY = touchStartY.current - touchEndY.current;
+
+        // Determine if this is a vertical or horizontal swipe
+        if (Math.abs(diffY) > Math.abs(diffX)) {
+            // Vertical swipe - check if it's upward and exceeds threshold
+            if (diffY > swipeThreshold && onClose) {
+                // Swipe up detected - close the dialog
+                onClose();
+            }
+        } else if (showButtons) {
+            // Horizontal swipe - navigate media only if there are multiple items
+            if (Math.abs(diffX) > swipeThreshold) {
+                if (diffX > 0) { nextMedia(); }
+                else { prevMedia(); }
+            }
+        }
+
+        touchStartX.current = null;
+        touchEndX.current = null;
+        touchStartY.current = null;
+        touchEndY.current = null;
     };
 
     // --- Effects ---
@@ -897,6 +924,7 @@ export default function Home() {
                     isUnplayableVideoFormat={selectedPost.isUnplayableVideoFormat ?? false}
                     onToggleFavorite={() => toggleFavorite(selectedPost)}
                     isFavorite={!!favorites[selectedPost.postId]}
+                    onClose={handleDialogClose}
                  />
               ) : ( <div className="text-white text-xl">Loading content...</div> )}
 
