@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { kv } from '@vercel/kv';
+import { getValidatedEnv } from '@/lib/env';
+import { authLogger, apiLogger } from '@/lib/logger';
+import { applyRateLimit, getClientIdentifier } from '@/lib/rate-limiter';
+import { redditApiQuerySchema, createValidationErrorResponse, isAllowedImageDomain } from '@/lib/validation';
 
 // ========================================================================
-// 1. TYPE DEFINITIONS & HELPER FUNCTION (No changes)
+// 1. TYPE DEFINITIONS & INTERFACES
 // ========================================================================
 export interface RedditPost {
     title: string;
@@ -12,9 +16,73 @@ export interface RedditPost {
     postId: string;
     isUnplayableVideoFormat?: boolean;
 }
+
 export type SortType = 'hot' | 'top';
 export type TimeFrame = 'day' | 'week' | 'month' | 'year' | 'all';
-const extractMediaUrls = (postDetail: any): string[] => {
+
+interface RedditApiData {
+    data: {
+        children: Array<{
+            data: RedditPostData;
+        }>;
+        after: string | null;
+    };
+}
+
+interface RedditPostData {
+    id: string;
+    title: string;
+    subreddit: string;
+    url: string;
+    url_overridden_by_dest?: string;
+    is_video?: boolean;
+    is_gallery?: boolean;
+    media?: {
+        reddit_video?: {
+            fallback_url?: string;
+        };
+        oembed?: {
+            thumbnail_url?: string;
+        };
+    };
+    secure_media?: {
+        reddit_video?: {
+            fallback_url?: string;
+        };
+        oembed?: {
+            thumbnail_url?: string;
+        };
+    };
+    preview?: {
+        images?: Array<{
+            source: {
+                url: string;
+            };
+        }>;
+        reddit_video_preview?: {
+            fallback_url: string;
+        };
+    };
+    gallery_data?: {
+        items: Array<{
+            media_id: string;
+        }>;
+    };
+    media_metadata?: {
+        [key: string]: {
+            p?: Array<{ u: string }>;
+            s?: { u: string };
+        };
+    };
+    crosspost_parent_list?: RedditPostData[];
+}
+/**
+ * Extracts media URLs from Reddit post data
+ * Handles galleries, videos, images, and cross-posts
+ * @param postDetail - Reddit post data object
+ * @returns Array of media URLs
+ */
+const extractMediaUrls = (postDetail: RedditPostData): string[] => {
     if (!postDetail) return [];
     const urls: string[] = [];
     let extracted = false;
@@ -69,22 +137,23 @@ const extractMediaUrls = (postDetail: any): string[] => {
 };
 
 // ========================================================================
-// 2. OAUTH TOKEN HANDLER (No changes)
+// 2. OAUTH TOKEN HANDLER
 // ========================================================================
+/**
+ * Gets Reddit OAuth access token, using cache when available
+ * @returns Promise resolving to access token
+ * @throws Error if credentials are missing or request fails
+ */
 async function getAccessToken(): Promise<string> {
     const cachedToken = await kv.get<string>('reddit_access_token');
     if (cachedToken) {
-        console.log('[AUTH_LOG] Using cached access token.');
+        authLogger.debug('Using cached access token');
         return cachedToken;
     }
 
-    console.log('[AUTH_LOG] Fetching new access token from Reddit...');
-    const clientId = process.env.REDDIT_CLIENT_ID;
-    const clientSecret = process.env.REDDIT_CLIENT_SECRET;
-
-    if (!clientId || !clientSecret) {
-        throw new Error('Missing Reddit API credentials in environment variables.');
-    }
+    authLogger.info('Fetching new access token from Reddit');
+    const env = getValidatedEnv();
+    const { REDDIT_CLIENT_ID: clientId, REDDIT_CLIENT_SECRET: clientSecret } = env;
 
     const authString = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
     const tokenUrl = 'https://www.reddit.com/api/v1/access_token';
@@ -100,6 +169,8 @@ async function getAccessToken(): Promise<string> {
     });
 
     if (!response.ok) {
+        const errorText = await response.text();
+        authLogger.error('Failed to get access token', { status: response.status, error: errorText });
         throw new Error(`Failed to get access token: ${response.status}`);
     }
 
@@ -107,61 +178,123 @@ async function getAccessToken(): Promise<string> {
     const token = data.access_token;
     const expiresIn = data.expires_in;
 
+    if (!token) {
+        authLogger.error('No access token in response', data);
+        throw new Error('No access token received from Reddit');
+    }
+
     await kv.set('reddit_access_token', token, { ex: expiresIn - 60 });
-    console.log('[AUTH_LOG] Successfully fetched and cached new token.');
+    authLogger.info('Successfully fetched and cached new token');
 
     return token;
 }
 
 // ========================================================================
-// 3. UPDATED API ROUTE HANDLER (With the fix)
+// 3. API ROUTE HANDLER
 // ========================================================================
+/**
+ * GET /api/reddit
+ * Fetches Reddit posts with rate limiting, validation, and proper error handling
+ */
 export async function GET(request: NextRequest) {
-    const { searchParams } = new URL(request.url);
-    const subreddit = searchParams.get('subreddit');
-    const sortType = searchParams.get('sortType') as SortType;
-    const timeFrame = searchParams.get('timeFrame') as TimeFrame | null;
-    const after = searchParams.get('after');
-    const limit = searchParams.get('limit') || '20';
-
-    if (!subreddit || !sortType) {
-        return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
-    }
+    const startTime = Date.now();
+    const clientId = getClientIdentifier(request);
+    
+    apiLogger.info('Reddit API request started', { clientId });
 
     try {
+        // Apply rate limiting
+        const rateLimitResult = await applyRateLimit(clientId, 'reddit');
+        
+        if (!rateLimitResult.success) {
+            apiLogger.warn('Rate limit exceeded', { clientId, resetTime: rateLimitResult.resetTime });
+            return NextResponse.json(
+                { 
+                    error: 'Rate limit exceeded',
+                    resetTime: rateLimitResult.resetTime,
+                    remaining: rateLimitResult.remaining
+                },
+                { 
+                    status: 429,
+                    headers: {
+                        'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+                        'X-RateLimit-Reset': Math.ceil(rateLimitResult.resetTime / 1000).toString(),
+                        'Retry-After': Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000).toString(),
+                    }
+                }
+            );
+        }
+
+        // Validate query parameters
+        const { searchParams } = new URL(request.url);
+        const queryParams = {
+            subreddit: searchParams.get('subreddit'),
+            sortType: searchParams.get('sortType'),
+            timeFrame: searchParams.get('timeFrame'),
+            after: searchParams.get('after'),
+            limit: searchParams.get('limit') || '20',
+        };
+
+        const validationResult = redditApiQuerySchema.safeParse(queryParams);
+        
+        if (!validationResult.success) {
+            apiLogger.warn('Invalid request parameters', { clientId, errors: validationResult.error.errors });
+            return NextResponse.json(
+                createValidationErrorResponse(validationResult.error),
+                { status: 400 }
+            );
+        }
+
+        const { subreddit, sortType, timeFrame, after, limit } = validationResult.data;
+
+        // Fetch data from Reddit
         const accessToken = await getAccessToken();
         let url = `https://oauth.reddit.com/r/${subreddit}/${sortType}.json?limit=${limit}&raw_json=1`;
         if (sortType === 'top' && timeFrame) { url += `&t=${timeFrame}`; }
         if (after) { url += `&after=${after}`; }
 
-        const userAgent = `web:gramviewer:v2.0.0 (by /u/${process.env.REDDIT_USERNAME || 'candyhunterz'})`;
+        const env = getValidatedEnv();
+        const userAgent = `web:gramviewer:v2.0.0 (by /u/${env.REDDIT_USERNAME || 'candyhunterz'})`;
+
+        apiLogger.debug('Fetching from Reddit', { url, subreddit, sortType });
 
         const redditResponse = await fetch(url, {
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'User-Agent': userAgent,
-            }
+            },
+            // Add timeout
+            signal: AbortSignal.timeout(10000), // 10 second timeout
         });
 
         if (!redditResponse.ok) {
             const errorDetails = await redditResponse.text();
-            console.error(`[REDDIT_API_ERROR] Status: ${redditResponse.status}. Details: ${errorDetails}`);
-            return NextResponse.json({ error: `Reddit API Error: ${redditResponse.status}` }, { status: redditResponse.status });
+            apiLogger.error('Reddit API error', { 
+                status: redditResponse.status, 
+                error: errorDetails, 
+                subreddit 
+            });
+            return NextResponse.json(
+                { error: `Reddit API Error: ${redditResponse.status}` },
+                { status: redditResponse.status >= 500 ? 502 : redditResponse.status }
+            );
         }
 
-        const data = await redditResponse.json();
+        const data: RedditApiData = await redditResponse.json();
 
         if (!data?.data?.children) {
+            apiLogger.warn('No children in Reddit response', { subreddit, data });
             return NextResponse.json({ posts: [], after: null });
         }
 
-        // ★★★★★★★★★★★★★★★★★★★★ THE FIX ★★★★★★★★★★★★★★★★★★★★
-        // The mapping logic is now correctly placed inside the .map() call.
-        // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+        // Process posts with improved type safety and validation
         const posts: RedditPost[] = data.data.children
-            .map((child: any): RedditPost | null => {
-                let postData = child?.data;
-                if (!postData) return null;
+            .map((child): RedditPost | null => {
+                const postData = child?.data;
+                if (!postData) {
+                    apiLogger.debug('No post data in child', { child });
+                    return null;
+                }
 
                 let mediaUrls = extractMediaUrls(postData);
                 let isUnplayableVideo = false;
@@ -176,11 +309,12 @@ export async function GET(request: NextRequest) {
                     } else if (extractionFailedForVideo) {
                         return null;
                     }
-if (mediaUrls.length > 0) {
-                       isUnplayableVideo = true;
+                    if (mediaUrls.length > 0) {
+                        isUnplayableVideo = true;
                     }
                 }
 
+                // Handle crosspost fallback
                 if (mediaUrls.length === 0 && postData.crosspost_parent_list?.[0]) {
                     const parentData = postData.crosspost_parent_list[0];
                     mediaUrls = extractMediaUrls(parentData);
@@ -200,10 +334,22 @@ if (mediaUrls.length > 0) {
                     }
                 }
 
-                if (mediaUrls.length > 0) {
+                // Filter and validate media URLs for security
+                const validMediaUrls = mediaUrls.filter(url => {
+                    try {
+                        // Basic URL validation
+                        new URL(url);
+                        // Check if domain is allowed
+                        return isAllowedImageDomain(url);
+                    } catch {
+                        return false;
+                    }
+                });
+
+                if (validMediaUrls.length > 0) {
                     return {
-                        title: postData.title || '',
-                        mediaUrls: mediaUrls,
+                        title: postData.title?.slice(0, 300) || '', // Limit title length
+                        mediaUrls: validMediaUrls.slice(0, 20), // Limit media count
                         subreddit: postData.subreddit || subreddit,
                         postId: postData.id,
                         isUnplayableVideoFormat: isUnplayableVideo,
@@ -211,12 +357,54 @@ if (mediaUrls.length > 0) {
                 }
                 return null;
             })
-            .filter((post: RedditPost | null): post is RedditPost => post !== null);
+            .filter((post): post is RedditPost => post !== null);
 
-        return NextResponse.json({ posts, after: data.data.after });
+        const duration = Date.now() - startTime;
+        apiLogger.info('Reddit API request completed', { 
+            clientId, 
+            subreddit, 
+            postsCount: posts.length, 
+            duration 
+        });
 
-    } catch (error: any) {
-        console.error(`[GLOBAL_HANDLER_ERROR] An unexpected error occurred:`, error);
-        return NextResponse.json({ error: `An internal server error occurred: ${error.message}` }, { status: 500 });
+        return NextResponse.json(
+            { posts, after: data.data.after },
+            {
+                headers: {
+                    'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+                    'X-RateLimit-Reset': Math.ceil(rateLimitResult.resetTime / 1000).toString(),
+                }
+            }
+        );
+
+    } catch (error) {
+        const duration = Date.now() - startTime;
+        apiLogger.error('Reddit API request failed', { 
+            clientId, 
+            error: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined,
+            duration 
+        });
+
+        // Handle specific error types
+        if (error instanceof Error) {
+            if (error.name === 'TimeoutError') {
+                return NextResponse.json(
+                    { error: 'Request timeout - Reddit API took too long to respond' },
+                    { status: 504 }
+                );
+            }
+            if (error.message.includes('Environment validation failed')) {
+                return NextResponse.json(
+                    { error: 'Server configuration error' },
+                    { status: 500 }
+                );
+            }
+        }
+
+        return NextResponse.json(
+            { error: 'An internal server error occurred' },
+            { status: 500 }
+        );
     }
 }
