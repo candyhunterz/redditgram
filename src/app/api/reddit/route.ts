@@ -25,7 +25,11 @@ const extractMediaUrls = (postDetail: any): string[] => {
                 const mediaMeta = postDetail.media_metadata[mediaId];
                 if (!mediaMeta) continue;
                 let bestUrl = '';
-                if (mediaMeta.p && mediaMeta.p.length > 0) bestUrl = mediaMeta.p[mediaMeta.p.length - 1]?.u;
+                // Use medium-sized preview (index 2-3) instead of largest for better loading performance
+                if (mediaMeta.p && mediaMeta.p.length > 0) {
+                    const mediumIndex = Math.min(2, mediaMeta.p.length - 1);
+                    bestUrl = mediaMeta.p[mediumIndex]?.u;
+                }
                 if (!bestUrl && mediaMeta.s?.u) bestUrl = mediaMeta.s.u;
                 if (bestUrl) urls.push(bestUrl);
             }

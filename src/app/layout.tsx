@@ -21,6 +21,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="dns-prefetch" href="https://preview.redd.it" />
+        <link rel="dns-prefetch" href="https://i.redd.it" />
+        <link rel="dns-prefetch" href="https://external-preview.redd.it" />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
       </body>

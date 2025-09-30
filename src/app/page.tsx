@@ -229,9 +229,9 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
                          <a href={`https://www.reddit.com/r/${subreddit}/comments/${postId}`} target="_blank" rel="noopener noreferrer" className="text-base underline text-blue-400 hover:text-blue-300"> View Original Post on Reddit </a>
                      </div>
                  ) : isVideo ? (
-                    <video key={`${currentMediaUrl}-${currentMediaIndex}`} src={currentMediaUrl} className={cn("object-contain block", isFullScreen ? 'max-h-[90vh] max-w-[95vw]' : 'h-auto w-full')} controls={isFullScreen} muted={!isFullScreen} playsInline autoPlay={isFullScreen} loop />
+                    <video key={`${currentMediaUrl}-${currentMediaIndex}`} src={currentMediaUrl} className={cn("object-contain block", isFullScreen ? 'max-h-[90vh] max-w-[95vw]' : 'h-auto w-full')} controls={isFullScreen} muted={!isFullScreen} playsInline autoPlay={isFullScreen} loop preload={isFullScreen ? "auto" : "metadata"} />
                  ) : (
-                    <img key={`${currentMediaUrl}-${currentMediaIndex}`} src={currentMediaUrl} alt={title} className={cn("object-cover block w-full", isFullScreen ? 'max-h-[90vh] max-w-[95vw] object-contain' : 'h-auto')} loading="lazy" />
+                    <img key={`${currentMediaUrl}-${currentMediaIndex}`} src={currentMediaUrl} alt={title} className={cn("object-cover block w-full", isFullScreen ? 'max-h-[90vh] max-w-[95vw] object-contain' : 'h-auto')} loading={!isFullScreen ? "lazy" : "eager"} />
                  )}
 
                  {!isFullScreen && !isUnplayableVideoFormat && ( <div className="absolute inset-0 z-10 cursor-pointer" aria-hidden="true" /> )}
