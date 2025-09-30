@@ -86,6 +86,7 @@ type SavedLists = { [name: string]: string };
 // --- MediaCarousel Component (Updated with Top Control Bar) ---
 interface MediaCarouselProps {
   mediaUrls: string[];
+  fullQualityUrls?: string[];
   title: string;
   subreddit: string;
   postId: string;
@@ -96,7 +97,7 @@ interface MediaCarouselProps {
 }
 
 const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
-    mediaUrls, title, subreddit, postId, isFullScreen = false, isUnplayableVideoFormat = false,
+    mediaUrls, fullQualityUrls, title, subreddit, postId, isFullScreen = false, isUnplayableVideoFormat = false,
     onToggleFavorite, isFavorite = false
 }) => {
     // --- State and Refs ---
@@ -107,7 +108,9 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
     const swipeThreshold = 50;
 
     // --- Derived State & Callbacks ---
-    const validMediaUrls = Array.isArray(mediaUrls) ? mediaUrls : [];
+    // Use full quality URLs for fullscreen, thumbnails for grid
+    const urlsToUse = isFullScreen && fullQualityUrls && fullQualityUrls.length > 0 ? fullQualityUrls : mediaUrls;
+    const validMediaUrls = Array.isArray(urlsToUse) ? urlsToUse : [];
     const showButtons = validMediaUrls.length > 1 && !isUnplayableVideoFormat;
 
     const nextMedia = useCallback(() => {
@@ -337,12 +340,14 @@ export default function Home() {
         // When showing only favorites, map the favorites map values
         return Object.values(favorites).map((favInfo): RedditPost => {
             const thumbnailUrl = favInfo.thumbnailUrl;
+            const urls = thumbnailUrl ? [thumbnailUrl] : [];
 
             return {
               postId: favInfo.postId,
               title: favInfo.title,
               subreddit: favInfo.subreddit,
-              mediaUrls: thumbnailUrl ? [thumbnailUrl] : [], // Use thumbnail
+              mediaUrls: urls, // Use thumbnail
+              fullQualityUrls: urls, // Favorites only have thumbnails, use same for fullscreen
               // *** FIX: Assume thumbnail is displayable, don't mark as unplayable video ***
               isUnplayableVideoFormat: false
             };
@@ -831,9 +836,14 @@ export default function Home() {
                      )}
                      {/* Grid Item Media Carousel */}
                      <MediaCarousel
-                        mediaUrls={post.mediaUrls} title={post.title} subreddit={post.subreddit}
-                        postId={post.postId} isUnplayableVideoFormat={isUnplayable}
-                        onToggleFavorite={() => toggleFavorite(post)} isFavorite={!!favorites[post.postId]}
+                        mediaUrls={post.mediaUrls}
+                        fullQualityUrls={post.fullQualityUrls}
+                        title={post.title}
+                        subreddit={post.subreddit}
+                        postId={post.postId}
+                        isUnplayableVideoFormat={isUnplayable}
+                        onToggleFavorite={() => toggleFavorite(post)}
+                        isFavorite={!!favorites[post.postId]}
                      />
                  </Card>
                 </div>);
@@ -878,9 +888,11 @@ export default function Home() {
 
               {selectedPost ? (
                  <MediaCarousel
-                    // Pass props down as before
-                    mediaUrls={selectedPost.mediaUrls} title={selectedPost.title}
-                    subreddit={selectedPost.subreddit} postId={selectedPost.postId}
+                    mediaUrls={selectedPost.mediaUrls}
+                    fullQualityUrls={selectedPost.fullQualityUrls}
+                    title={selectedPost.title}
+                    subreddit={selectedPost.subreddit}
+                    postId={selectedPost.postId}
                     isFullScreen={true}
                     isUnplayableVideoFormat={selectedPost.isUnplayableVideoFormat ?? false}
                     onToggleFavorite={() => toggleFavorite(selectedPost)}

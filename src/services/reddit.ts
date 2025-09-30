@@ -3,7 +3,8 @@
 // The types remain the same as they are used by your component.
 export interface RedditPost {
     title: string;
-    mediaUrls: string[];
+    mediaUrls: string[]; // Thumbnail/preview URLs for grid view
+    fullQualityUrls: string[]; // Full quality URLs for fullscreen view
     subreddit: string;
     postId: string;
     isUnplayableVideoFormat?: boolean;
