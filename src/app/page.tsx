@@ -314,6 +314,8 @@ export default function Home() {
   const [selectedListName, setSelectedListName] = useState<string>("");
   const [isControlsOpen, setIsControlsOpen] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [favoritesLoadComplete, setFavoritesLoadComplete] = useState(false);
 
   const { toast } = useToast();
 
@@ -360,14 +362,21 @@ export default function Home() {
         if (Object.keys(lists).length > 0) {
           setSavedLists(lists);
         }
+
+        // Mark initial load as complete
+        setInitialLoadComplete(true);
       } catch (err) {
         console.error("Failed to load saved lists:", err);
+        setInitialLoadComplete(true);
       }
     };
     loadLists();
   }, []);
 
   useEffect(() => {
+    // Don't save until initial load is complete
+    if (!initialLoadComplete) return;
+
     const saveLists = async () => {
       try {
         await saveAllLists(savedLists);
@@ -381,7 +390,7 @@ export default function Home() {
       }
     };
     saveLists();
-  }, [savedLists, toast]);
+  }, [savedLists, toast, initialLoadComplete]);
 
   // --- Load/Save Favorites (IndexedDB) ---
   useEffect(() => {
@@ -391,14 +400,21 @@ export default function Home() {
         if (Object.keys(favs).length > 0) {
           setFavorites(favs);
         }
+
+        // Mark favorites load as complete
+        setFavoritesLoadComplete(true);
       } catch (err) {
         console.error("Failed to load favorites:", err);
+        setFavoritesLoadComplete(true);
       }
     };
     loadFavorites();
   }, []);
 
   useEffect(() => {
+    // Don't save until initial load is complete
+    if (!favoritesLoadComplete) return;
+
     const saveFavorites = async () => {
       try {
         await saveAllFavorites(favorites);
@@ -412,7 +428,7 @@ export default function Home() {
       }
     };
     saveFavorites();
-  }, [favorites, toast]);
+  }, [favorites, toast, favoritesLoadComplete]);
 
   // --- Favorites Handlers ---
   const toggleFavorite = useCallback((post: RedditPost) => {
