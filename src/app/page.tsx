@@ -35,6 +35,17 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import Masonry from 'react-masonry-css';
+import { ProgressiveImage, ProgressiveVideo } from '@/components/progressive-image';
+import {
+  getCachedPosts,
+  setCachedPosts,
+  clearOldCache,
+  getAllFavorites,
+  saveAllFavorites,
+  getAllSavedLists,
+  saveAllLists,
+} from '@/lib/indexed-db';
+import { usePrefetch } from '@/hooks/use-prefetch';
 // *** End Standard Imports ***
 
 
@@ -229,9 +240,25 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
                          <a href={`https://www.reddit.com/r/${subreddit}/comments/${postId}`} target="_blank" rel="noopener noreferrer" className="text-base underline text-blue-400 hover:text-blue-300"> View Original Post on Reddit </a>
                      </div>
                  ) : isVideo ? (
-                    <video key={`${currentMediaUrl}-${currentMediaIndex}`} src={currentMediaUrl} className={cn("object-contain block", isFullScreen ? 'max-h-[90vh] max-w-[95vw]' : 'h-auto w-full')} controls={isFullScreen} muted={!isFullScreen} playsInline autoPlay={isFullScreen} loop preload={isFullScreen ? "auto" : "metadata"} />
+                    <ProgressiveVideo
+                      key={`${currentMediaUrl}-${currentMediaIndex}`}
+                      src={currentMediaUrl}
+                      className={cn("object-contain block", isFullScreen ? 'max-h-[90vh] max-w-[95vw]' : 'h-auto w-full')}
+                      controls={isFullScreen}
+                      muted={!isFullScreen}
+                      playsInline
+                      autoPlay={isFullScreen}
+                      loop
+                      preload={isFullScreen ? "auto" : "metadata"}
+                    />
                  ) : (
-                    <img key={`${currentMediaUrl}-${currentMediaIndex}`} src={currentMediaUrl} alt={title} className={cn("object-cover block w-full", isFullScreen ? 'max-h-[90vh] max-w-[95vw] object-contain' : 'h-auto')} loading={!isFullScreen ? "lazy" : "eager"} />
+                    <ProgressiveImage
+                      key={`${currentMediaUrl}-${currentMediaIndex}`}
+                      src={currentMediaUrl}
+                      alt={title}
+                      className={cn("object-cover block w-full", isFullScreen ? 'max-h-[90vh] max-w-[95vw] object-contain' : 'h-auto')}
+                      loading={!isFullScreen ? "lazy" : "eager"}
+                    />
                  )}
 
                  {!isFullScreen && !isUnplayableVideoFormat && ( <div className="absolute inset-0 z-10 cursor-pointer" aria-hidden="true" /> )}
@@ -321,93 +348,70 @@ export default function Home() {
     }
   }, [posts, favorites, showFavoritesOnly]);
 
-  // --- Load/Save Saved Lists ---
+  // --- Load/Save Saved Lists (IndexedDB) ---
   useEffect(() => {
-    try {
-        const storedLists = localStorage.getItem(LOCAL_STORAGE_SAVED_LISTS_KEY);
-        if (storedLists) {
-            const parsed = JSON.parse(storedLists);
-            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-                 setSavedLists(parsed as SavedLists);
-            } else { localStorage.removeItem(LOCAL_STORAGE_SAVED_LISTS_KEY); }
+    const loadLists = async () => {
+      try {
+        // Clear old cache on mount
+        await clearOldCache();
+
+        // Load saved lists from IndexedDB
+        const lists = await getAllSavedLists();
+        if (Object.keys(lists).length > 0) {
+          setSavedLists(lists);
         }
-    } catch (err) { console.error("Failed to load saved lists:", err); localStorage.removeItem(LOCAL_STORAGE_SAVED_LISTS_KEY); }
+      } catch (err) {
+        console.error("Failed to load saved lists:", err);
+      }
+    };
+    loadLists();
   }, []);
 
   useEffect(() => {
-    if (Object.keys(savedLists).length > 0) {
+    const saveLists = async () => {
       try {
-        localStorage.setItem(LOCAL_STORAGE_SAVED_LISTS_KEY, JSON.stringify(savedLists));
+        await saveAllLists(savedLists);
       } catch (err) {
         console.error("Failed to save lists:", err);
-        if (err instanceof DOMException && (err.name === 'QuotaExceededError' || err.code === 22)) {
-          toast({ 
-            variant: "destructive", 
-            title: "Storage Full",
-            description: "Cannot save list. Local storage limit reached." 
-          });
-        } else {
-          toast({ 
-            variant: "destructive", 
-            title: "Save Error",
-            description: "Failed to save lists to storage." 
-          });
-        }
+        toast({
+          variant: "destructive",
+          title: "Save Error",
+          description: "Failed to save lists to storage."
+        });
       }
-    } else {
-      try {
-        localStorage.removeItem(LOCAL_STORAGE_SAVED_LISTS_KEY);
-      } catch (err) {
-        console.error("Failed to remove lists:", err);
-      }
-    }
+    };
+    saveLists();
   }, [savedLists, toast]);
 
-  // --- Load/Save Favorites ---
+  // --- Load/Save Favorites (IndexedDB) ---
   useEffect(() => {
-    try {
-      const storedFavorites = localStorage.getItem(LOCAL_STORAGE_FAVORITES_KEY);
-      if (storedFavorites) {
-        const parsed = JSON.parse(storedFavorites);
-        if (typeof parsed === 'object' && !Array.isArray(parsed)) {
-          setFavorites(parsed as FavoritesMap);
-        } else {
-          localStorage.removeItem(LOCAL_STORAGE_FAVORITES_KEY);
+    const loadFavorites = async () => {
+      try {
+        const favs = await getAllFavorites();
+        if (Object.keys(favs).length > 0) {
+          setFavorites(favs);
         }
+      } catch (err) {
+        console.error("Failed to load favorites:", err);
       }
-    } catch (err) {
-      console.error("Failed to load favorites:", err);
-      localStorage.removeItem(LOCAL_STORAGE_FAVORITES_KEY);
-    }
+    };
+    loadFavorites();
   }, []);
 
   useEffect(() => {
-    if (Object.keys(favorites).length > 0) {
+    const saveFavorites = async () => {
       try {
-        localStorage.setItem(LOCAL_STORAGE_FAVORITES_KEY, JSON.stringify(favorites));
+        await saveAllFavorites(favorites);
       } catch (err) {
         console.error("Failed to save favorites:", err);
-        if (err instanceof DOMException && (err.name === 'QuotaExceededError' || err.code === 22)) {
-          toast({ 
-            variant: "destructive", 
-            title: "Storage Full",
-            description: "Cannot save favorites. Local storage limit reached." 
-          });
-        } else {
-          toast({ 
-            variant: "destructive", 
-            title: "Save Error",
-            description: "Failed to save favorites to storage." 
-          });
-        }
+        toast({
+          variant: "destructive",
+          title: "Save Error",
+          description: "Failed to save favorites to storage."
+        });
       }
-    } else {
-      try {
-        localStorage.removeItem(LOCAL_STORAGE_FAVORITES_KEY);
-      } catch (err) {
-        console.error("Failed to remove favorites:", err);
-      }
-    }
+    };
+    saveFavorites();
   }, [favorites, toast]);
 
   // --- Favorites Handlers ---
@@ -470,8 +474,9 @@ export default function Home() {
         const cacheKey = generateCacheKey(sub, currentSortType, currentSortType === 'top' ? currentTimeFrame : undefined, afterParam);
         subOrderForResults.push(sub);
 
+        // Check in-memory cache first (fastest)
         if (apiCache.has(cacheKey)) {
-            console.log(`%cCache HIT for key: ${cacheKey}`, 'color: green');
+            console.log(`%cMemory Cache HIT for key: ${cacheKey}`, 'color: green');
             const cachedData = apiCache.get(cacheKey)!;
             const postsWithMetadata = cachedData.posts.map(p => ({
                 ...p,
@@ -484,23 +489,47 @@ export default function Home() {
                 sub: sub
             }));
         } else {
-            console.log(`%cCache MISS for key: ${cacheKey}`, 'color: orange');
+            // Check IndexedDB cache (persistent)
             fetchPromises.push(
-                getPosts(sub, currentSortType, {
-                    timeFrame: currentSortType === 'top' ? currentTimeFrame : undefined,
-                    after: afterParam,
-                    limit: POSTS_PER_LOAD
-                }).then(response => {
+                (async () => {
+                    const idbCached = await getCachedPosts(cacheKey);
+                    if (idbCached) {
+                        console.log(`%cIndexedDB Cache HIT for key: ${cacheKey}`, 'color: blue');
+                        // Store in memory cache for faster subsequent access
+                        apiCache.set(cacheKey, { posts: idbCached.posts, after: idbCached.after });
+                        const postsWithMetadata = idbCached.posts.map(p => ({
+                            ...p,
+                            subreddit: sub,
+                            isUnplayableVideoFormat: p.isUnplayableVideoFormat ?? false
+                        }));
+                        return { posts: postsWithMetadata, after: idbCached.after, sub: sub };
+                    }
+
+                    // Cache miss - fetch from API
+                    console.log(`%cCache MISS for key: ${cacheKey}`, 'color: orange');
+                    const response = await getPosts(sub, currentSortType, {
+                        timeFrame: currentSortType === 'top' ? currentTimeFrame : undefined,
+                        after: afterParam,
+                        limit: POSTS_PER_LOAD
+                    });
+
+                    // Store in both caches
                     const dataToCache: CachedRedditResponse = { posts: response.posts, after: response.after };
                     apiCache.set(cacheKey, dataToCache);
-                    console.log(`%cStored in cache: ${cacheKey}`, 'color: blue');
+                    await setCachedPosts(cacheKey, response.posts, response.after, {
+                        subreddit: sub,
+                        sortType: currentSortType,
+                        timeFrame: currentSortType === 'top' ? currentTimeFrame : undefined,
+                    });
+                    console.log(`%cStored in both caches: ${cacheKey}`, 'color: purple');
+
                     const postsWithMetadata = response.posts.map(p => ({
                         ...p,
                         subreddit: sub,
                         isUnplayableVideoFormat: p.isUnplayableVideoFormat ?? false
                     }));
                     return { posts: postsWithMetadata, after: response.after, sub: sub };
-                })
+                })()
             );
         }
     }
@@ -591,6 +620,20 @@ export default function Home() {
    }, [isLoading, hasMore, fetchInitiated, afterTokens, subredditInput, sortType, timeFrame, toast, performFetch, apiCache]);
 
    useEffect(() => { loadMorePostsRef.current = loadMorePosts; }, [loadMorePosts]);
+
+   // --- Prefetch next page at 80% scroll ---
+   const { resetPrefetch } = usePrefetch({
+     onPrefetch: loadMorePosts,
+     enabled: !isLoading && hasMore && fetchInitiated && !showFavoritesOnly,
+     threshold: 80,
+   });
+
+   // Reset prefetch trigger when new posts are loaded
+   useEffect(() => {
+     if (!isLoading && posts.length > 0) {
+       resetPrefetch();
+     }
+   }, [posts.length, isLoading, resetPrefetch]);
 
    // --- Scroll Listener Effect for Scroll-to-Top Button ---
   useEffect(() => {

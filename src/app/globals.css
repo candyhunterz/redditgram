@@ -109,3 +109,18 @@ body {
   margin-bottom: 6px; /* Adjust to match gap */
 }
 /* --- End Masonry Grid Styles --- */
+
+/* --- Progressive Image Loading Animation --- */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
+/* --- End Progressive Image Loading Animation --- */
