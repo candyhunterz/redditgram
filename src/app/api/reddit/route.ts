@@ -50,9 +50,26 @@ const extractMediaUrls = (postDetail: any): string[] => {
         const finalUrl = postDetail.url_overridden_by_dest || postDetail.url;
         if (!extracted && finalUrl) {
              const lowerUrl = finalUrl.toLowerCase();
-             if (lowerUrl.endsWith('.jpg') || lowerUrl.endsWith('.jpeg') || lowerUrl.endsWith('.png') || lowerUrl.endsWith('.gif') || lowerUrl.endsWith('.webp')) {
+             if (lowerUrl.endsWith('.jpg') || lowerUrl.endsWith('.jpeg') || lowerUrl.endsWith('.png') || lowerUrl.endsWith('.webp')) {
                 urls.push(finalUrl);
                 extracted = true;
+             } else if (lowerUrl.endsWith('.gif')) {
+                // For GIFs, try to use a preview/thumbnail instead of the full-size GIF
+                if (postDetail.preview?.images?.[0]?.resolutions && postDetail.preview.images[0].resolutions.length > 0) {
+                    // Use a medium-sized preview (similar to gallery logic)
+                    const resolutions = postDetail.preview.images[0].resolutions;
+                    const mediumIndex = Math.min(2, resolutions.length - 1);
+                    const previewUrl = resolutions[mediumIndex]?.url;
+                    if (previewUrl) {
+                        urls.push(previewUrl);
+                        extracted = true;
+                    }
+                }
+                // Fallback to full GIF if no preview available
+                if (!extracted) {
+                    urls.push(finalUrl);
+                    extracted = true;
+                }
              }
         }
         const oEmbed = postDetail.media?.oembed || postDetail.secure_media?.oembed;
