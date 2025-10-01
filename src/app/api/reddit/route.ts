@@ -56,10 +56,9 @@ const extractMediaUrls = (postDetail: any): string[] => {
              } else if (lowerUrl.endsWith('.gif')) {
                 // For GIFs, try to use a preview/thumbnail instead of the full-size GIF
                 if (postDetail.preview?.images?.[0]?.resolutions && postDetail.preview.images[0].resolutions.length > 0) {
-                    // Use a medium-sized preview (similar to gallery logic)
+                    // Use the smallest thumbnail for fastest loading in grid view
                     const resolutions = postDetail.preview.images[0].resolutions;
-                    const mediumIndex = Math.min(2, resolutions.length - 1);
-                    const previewUrl = resolutions[mediumIndex]?.url;
+                    const previewUrl = resolutions[0]?.url;
                     if (previewUrl) {
                         urls.push(previewUrl);
                         extracted = true;
