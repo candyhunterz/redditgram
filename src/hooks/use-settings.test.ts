@@ -72,7 +72,7 @@ describe('useSettings', () => {
     expect(result.current.settings.theme).toBe('light')
     // Other settings should use defaults
     expect(result.current.settings.gridDensity).toBe(DEFAULT_SETTINGS.gridDensity)
-    expect(result.current.settings.slideshowInterval).toBe(DEFAULT_SETTINGS.slideshowInterval)
+    expect(result.current.settings.keyboardShortcutsEnabled).toBe(DEFAULT_SETTINGS.keyboardShortcutsEnabled)
   })
 
   it('should update a single setting', () => {
@@ -174,28 +174,6 @@ describe('useSettings', () => {
 
     // Settings should remain unchanged
     expect(result.current.settings).toEqual(originalSettings)
-  })
-
-  it('should clamp slideshow interval to valid range', () => {
-    const { result } = renderHook(() => useSettings())
-
-    // Too low
-    act(() => {
-      result.current.updateSetting('slideshowInterval', 500)
-    })
-    expect(result.current.settings.slideshowInterval).toBe(1000)
-
-    // Too high
-    act(() => {
-      result.current.updateSetting('slideshowInterval', 60000)
-    })
-    expect(result.current.settings.slideshowInterval).toBe(30000)
-
-    // Valid value
-    act(() => {
-      result.current.updateSetting('slideshowInterval', 5000)
-    })
-    expect(result.current.settings.slideshowInterval).toBe(5000)
   })
 
   it('should resolve system theme based on media query', () => {

@@ -10,7 +10,6 @@ export interface Settings {
   gridDensity: GridDensity
   nsfwEnabled: boolean
   nsfwBlurred: boolean
-  slideshowInterval: number
   keyboardShortcutsEnabled: boolean
   autoplayVideos: boolean
   showMetadata: boolean
@@ -21,19 +20,12 @@ export const DEFAULT_SETTINGS: Settings = {
   gridDensity: 'comfortable',
   nsfwEnabled: false,
   nsfwBlurred: true,
-  slideshowInterval: 5000,
   keyboardShortcutsEnabled: true,
   autoplayVideos: true,
   showMetadata: true,
 }
 
 const SETTINGS_STORAGE_KEY = 'redditgram-settings'
-const MIN_SLIDESHOW_INTERVAL = 1000
-const MAX_SLIDESHOW_INTERVAL = 30000
-
-function clampSlideshowInterval(value: number): number {
-  return Math.min(MAX_SLIDESHOW_INTERVAL, Math.max(MIN_SLIDESHOW_INTERVAL, value))
-}
 
 function validateSettings(settings: Partial<Settings>): Partial<Settings> {
   const validated = { ...settings }
@@ -46,11 +38,6 @@ function validateSettings(settings: Partial<Settings>): Partial<Settings> {
   // Validate grid density
   if (validated.gridDensity && !['compact', 'comfortable', 'spacious'].includes(validated.gridDensity)) {
     validated.gridDensity = DEFAULT_SETTINGS.gridDensity
-  }
-
-  // Validate slideshow interval
-  if (typeof validated.slideshowInterval === 'number') {
-    validated.slideshowInterval = clampSlideshowInterval(validated.slideshowInterval)
   }
 
   return validated
@@ -102,14 +89,7 @@ export function useSettings() {
   // Update a single setting
   const updateSetting = useCallback(<K extends keyof Settings>(key: K, value: Settings[K]) => {
     setSettings(current => {
-      let validatedValue = value
-
-      // Special handling for slideshow interval
-      if (key === 'slideshowInterval' && typeof value === 'number') {
-        validatedValue = clampSlideshowInterval(value) as Settings[K]
-      }
-
-      const updated = { ...current, [key]: validatedValue }
+      const updated = { ...current, [key]: value }
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated))
       return updated
     })

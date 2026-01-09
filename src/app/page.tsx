@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { RedditPost, getPosts, SortType, TimeFrame } from "@/services/reddit";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Trash2, Save, X, Video, Copy as GalleryIcon, Filter, Loader2, ArrowUp, Heart, Sun, Moon, ArrowUpCircle, MessageCircle, Share2, Download, EyeOff, Eye, TrendingUp, HelpCircle, Keyboard, Search, Grid3X3, LayoutGrid, Grid2X2, Play, Pause, FolderPlus, Folder, Plus, Settings } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trash2, Save, X, Video, Copy as GalleryIcon, Filter, Loader2, ArrowUp, Heart, Sun, Moon, ArrowUpCircle, MessageCircle, Share2, Download, EyeOff, Eye, TrendingUp, HelpCircle, Keyboard, Search, Grid3X3, LayoutGrid, Grid2X2, FolderPlus, Folder, Plus, Settings } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { useNsfwFilter } from "@/hooks/use-nsfw-filter";
 import { useSubredditHistory, POPULAR_SUBREDDITS } from "@/hooks/use-subreddit-history";
@@ -18,7 +18,6 @@ import { sharePost } from "@/lib/share";
 import { downloadMedia } from "@/lib/download";
 import { usePostSearch } from "@/hooks/use-post-search";
 import { useGridDensity, DENSITY_CONFIG } from "@/hooks/use-grid-density";
-import { useSlideshow } from "@/hooks/use-slideshow";
 import { useCollections, CollectionPost } from "@/hooks/use-collections";
 import { useSettings } from "@/hooks/use-settings";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
@@ -480,7 +479,6 @@ export default function Home() {
   const [showCollectionsModal, setShowCollectionsModal] = useState(false);
   const [collectionTargetPost, setCollectionTargetPost] = useState<RedditPost | null>(null);
   const [newCollectionName, setNewCollectionName] = useState('');
-  const [selectedPostIndex, setSelectedPostIndex] = useState(0);
 
   // --- Cache ---
   const apiCache = useRef(new Map<CacheKey, CachedRedditResponse>()).current;
@@ -526,21 +524,6 @@ export default function Home() {
 
   // Apply search filter
   const { searchQuery, setSearchQuery, filteredPosts: postsToDisplay, clearSearch, highlightMatch } = usePostSearch(basePosts);
-
-  // Slideshow navigation handler (must be after postsToDisplay is defined)
-  const handleNextPost = useCallback(() => {
-    if (postsToDisplay.length === 0) return;
-    setSelectedPostIndex(prev => {
-      const nextIndex = (prev + 1) % postsToDisplay.length;
-      setSelectedPost(postsToDisplay[nextIndex]);
-      return nextIndex;
-    });
-  }, [postsToDisplay]);
-
-  const slideshow = useSlideshow({
-    onNext: handleNextPost,
-    initialInterval: 5000,
-  });
 
   // --- Load/Save Saved Lists (IndexedDB) ---
   useEffect(() => {
@@ -867,17 +850,15 @@ export default function Home() {
 
 
   // --- Event Handlers ---
-  const handleThumbnailClick = useCallback((post: RedditPost, index: number) => {
+  const handleThumbnailClick = useCallback((post: RedditPost) => {
     setSelectedPost(post);
-    setSelectedPostIndex(index);
     setIsDialogOpen(true);
   }, []);
 
   const handleDialogClose = useCallback(() => {
     setIsDialogOpen(false);
-    slideshow.pause(); // Stop slideshow when closing
     setTimeout(() => { setSelectedPost(null); }, 300);
-  }, [slideshow]);
+  }, []);
 
   // --- Share Handler ---
   const handleShare = useCallback(async (post: RedditPost) => {
@@ -1302,11 +1283,11 @@ export default function Home() {
                      ref={!showFavoritesOnly && postsToDisplay[postsToDisplay.length-1]===post ? lastPostRef : null}
                      className="mb-1.5" style={{ marginBottom: `${densityConfig.gap}px` }}
                      role="listitem">
-                 <Card onClick={()=> !isUnplayable && handleThumbnailClick(post, index)}
+                 <Card onClick={()=> !isUnplayable && handleThumbnailClick(post)}
                        onKeyDown={(e) => {
                          if (!isUnplayable && (e.key === 'Enter' || e.key === ' ')) {
                            e.preventDefault();
-                           handleThumbnailClick(post, index);
+                           handleThumbnailClick(post);
                          }
                        }}
                        tabIndex={isUnplayable ? -1 : 0}
@@ -1410,34 +1391,12 @@ export default function Home() {
               <DialogTitle className="sr-only"> Expanded view: {selectedPost?.title || 'Reddit Post'} </DialogTitle>
               <DialogDescription className="sr-only"> Expanded view of Reddit post: {selectedPost?.title || 'Content'}... </DialogDescription>
 
-              {/* Slideshow Controls */}
-              <div className="absolute top-2 left-1/2 transform -translate-x-1/2 z-50 flex items-center gap-2 bg-black/60 rounded-full px-3 py-1.5">
+              {/* Collection Button */}
+              <div className="absolute top-2 left-1/2 transform -translate-x-1/2 z-50">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 rounded-full text-white hover:bg-white/20"
-                  onClick={slideshow.toggle}
-                  title={slideshow.isPlaying ? "Pause slideshow" : "Start slideshow"}
-                >
-                  {slideshow.isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                </Button>
-                <span className="text-white text-xs">
-                  {selectedPostIndex + 1} / {postsToDisplay.length}
-                </span>
-                <select
-                  className="bg-transparent text-white text-xs border-none outline-none cursor-pointer"
-                  value={slideshow.interval}
-                  onChange={(e) => slideshow.setInterval(Number(e.target.value))}
-                  title="Slideshow speed"
-                >
-                  <option value={3000} className="bg-black">3s</option>
-                  <option value={5000} className="bg-black">5s</option>
-                  <option value={10000} className="bg-black">10s</option>
-                </select>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-full text-white hover:bg-white/20"
+                  className="h-8 w-8 rounded-full text-white bg-black/60 hover:bg-black/80"
                   onClick={() => {
                     setCollectionTargetPost(selectedPost);
                     setShowCollectionsModal(true);

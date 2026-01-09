@@ -16,7 +16,6 @@ import {
   Grid3X3,
   LayoutGrid,
   Grid2X2,
-  Play,
   RotateCcw,
 } from 'lucide-react'
 
@@ -39,14 +38,6 @@ const DENSITY_OPTIONS: { value: GridDensity; label: string; icon: React.ReactNod
   { value: 'compact', label: 'Compact', icon: <Grid3X3 className="h-4 w-4" /> },
   { value: 'comfortable', label: 'Comfortable', icon: <LayoutGrid className="h-4 w-4" /> },
   { value: 'spacious', label: 'Spacious', icon: <Grid2X2 className="h-4 w-4" /> },
-]
-
-const SLIDESHOW_INTERVALS = [
-  { value: 3000, label: '3 seconds' },
-  { value: 5000, label: '5 seconds' },
-  { value: 10000, label: '10 seconds' },
-  { value: 15000, label: '15 seconds' },
-  { value: 30000, label: '30 seconds' },
 ]
 
 export function SettingsModal({
@@ -220,31 +211,6 @@ export function SettingsModal({
                   </button>
                 </div>
               )}
-            </div>
-          </section>
-
-          {/* Slideshow Section */}
-          <section aria-labelledby="slideshow-heading">
-            <h3 id="slideshow-heading" className="text-sm font-medium mb-3 flex items-center gap-2">
-              <Play className="h-4 w-4" />
-              Slideshow
-            </h3>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm">Auto-advance interval</Label>
-                <select
-                  value={settings.slideshowInterval}
-                  onChange={(e) => updateSetting('slideshowInterval', Number(e.target.value))}
-                  className="text-sm border rounded-md px-2 py-1 bg-background"
-                  aria-label="Slideshow interval"
-                >
-                  {SLIDESHOW_INTERVALS.map((interval) => (
-                    <option key={interval.value} value={interval.value}>
-                      {interval.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
             </div>
           </section>
 

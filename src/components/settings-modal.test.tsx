@@ -13,7 +13,6 @@ jest.mock('lucide-react', () => ({
   Grid3X3: () => <span data-testid="grid3x3-icon">Grid3X3</span>,
   LayoutGrid: () => <span data-testid="layoutgrid-icon">LayoutGrid</span>,
   Grid2X2: () => <span data-testid="grid2x2-icon">Grid2X2</span>,
-  Play: () => <span data-testid="play-icon">Play</span>,
   RotateCcw: () => <span data-testid="rotateccw-icon">RotateCcw</span>,
 }))
 
@@ -169,22 +168,6 @@ describe('SettingsModal', () => {
     fireEvent.click(screen.getByLabelText('Show NSFW content'))
 
     expect(mockUpdateSetting).toHaveBeenCalledWith('nsfwEnabled', true)
-  })
-
-  it('should display slideshow interval setting', () => {
-    render(
-      <SettingsModal
-        isOpen={true}
-        onClose={mockOnClose}
-        settings={mockSettings}
-        updateSetting={mockUpdateSetting}
-        resetSettings={mockResetSettings}
-        resolvedTheme="light"
-      />
-    )
-
-    expect(screen.getByText('Slideshow')).toBeInTheDocument()
-    expect(screen.getByText('5 seconds')).toBeInTheDocument()
   })
 
   it('should call resetSettings when reset button is clicked', () => {

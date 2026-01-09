@@ -10,7 +10,8 @@
       "Bash(dir:*)",
       "Bash(npm test:*)",
       "Bash(npm run typecheck:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(git pull:*)"
     ],
     "deny": [],
     "ask": []
