@@ -29,13 +29,18 @@ interface DownloadMediaParams {
 }
 
 /**
- * Download media file from URL
+ * Download media file from URL using server-side proxy to bypass CORS
  */
 export async function downloadMedia(params: DownloadMediaParams): Promise<boolean> {
   const { url, subreddit, postId } = params
 
   try {
-    const response = await fetch(url)
+    const filename = generateFilename(subreddit, postId, url)
+
+    // Use server-side proxy to bypass CORS restrictions
+    const proxyUrl = `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`
+
+    const response = await fetch(proxyUrl)
 
     if (!response.ok) {
       return false
@@ -44,14 +49,14 @@ export async function downloadMedia(params: DownloadMediaParams): Promise<boolea
     const blob = await response.blob()
     const blobUrl = URL.createObjectURL(blob)
 
-    const filename = generateFilename(subreddit, postId, url)
-
     // Create temporary link and trigger download
     const link = document.createElement('a')
     link.href = blobUrl
     link.download = filename
     link.style.display = 'none'
+    document.body.appendChild(link)
     link.click()
+    document.body.removeChild(link)
 
     // Clean up
     URL.revokeObjectURL(blobUrl)

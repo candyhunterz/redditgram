@@ -467,7 +467,15 @@ export default function Home() {
   } = useSettings();
 
   // Phase 3 hooks
-  const { density, cycleDensity, config: densityConfig, gridStyle } = useGridDensity();
+  const { density, setDensity, cycleDensity, config: densityConfig, gridStyle } = useGridDensity();
+
+  // Sync settings.gridDensity with useGridDensity hook
+  useEffect(() => {
+    if (settings.gridDensity !== density) {
+      setDensity(settings.gridDensity);
+    }
+  }, [settings.gridDensity, density, setDensity]);
+
   const {
     collections,
     createCollection,

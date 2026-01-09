@@ -5,6 +5,8 @@ const mockFetch = jest.fn()
 const mockCreateObjectURL = jest.fn()
 const mockRevokeObjectURL = jest.fn()
 const mockClick = jest.fn()
+const mockAppendChild = jest.fn()
+const mockRemoveChild = jest.fn()
 
 describe('download utilities', () => {
   beforeEach(() => {
@@ -12,6 +14,10 @@ describe('download utilities', () => {
     global.fetch = mockFetch
     Object.defineProperty(URL, 'createObjectURL', { value: mockCreateObjectURL, configurable: true })
     Object.defineProperty(URL, 'revokeObjectURL', { value: mockRevokeObjectURL, configurable: true })
+
+    // Mock document.body methods
+    jest.spyOn(document.body, 'appendChild').mockImplementation(mockAppendChild)
+    jest.spyOn(document.body, 'removeChild').mockImplementation(mockRemoveChild)
 
     // Mock document.createElement
     jest.spyOn(document, 'createElement').mockImplementation((tag: string) => {
@@ -46,7 +52,7 @@ describe('download utilities', () => {
   })
 
   describe('downloadMedia', () => {
-    it('should download media successfully', async () => {
+    it('should download media successfully via proxy', async () => {
       const mockBlob = new Blob(['test'], { type: 'image/jpeg' })
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -60,7 +66,9 @@ describe('download utilities', () => {
         postId: 'abc123',
       })
 
-      expect(mockFetch).toHaveBeenCalledWith('https://i.redd.it/image.jpg')
+      // Should use proxy route with encoded URL and filename
+      const expectedProxyUrl = '/api/download?url=https%3A%2F%2Fi.redd.it%2Fimage.jpg&filename=reddit_funny_abc123.jpg'
+      expect(mockFetch).toHaveBeenCalledWith(expectedProxyUrl)
       expect(mockCreateObjectURL).toHaveBeenCalledWith(mockBlob)
       expect(mockClick).toHaveBeenCalled()
       expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:test-url')
