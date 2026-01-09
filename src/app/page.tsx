@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { RedditPost, getPosts, SortType, TimeFrame } from "@/services/reddit";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Trash2, Save, X, Video, Copy as GalleryIcon, Filter, Loader2, ArrowUp, Heart, Sun, Moon, ArrowUpCircle, MessageCircle, Share2, Download, EyeOff, Eye, TrendingUp, HelpCircle, Keyboard, Search, Grid3X3, LayoutGrid, Grid2X2, FolderPlus, Folder, Plus, Settings } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trash2, Save, X, Video, Copy as GalleryIcon, Filter, Loader2, ArrowUp, Heart, Sun, Moon, ArrowUpCircle, MessageCircle, Share2, Download, EyeOff, Eye, TrendingUp, HelpCircle, Keyboard, Search, Grid3X3, LayoutGrid, Grid2X2, Settings } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { useNsfwFilter } from "@/hooks/use-nsfw-filter";
 import { useSubredditHistory, POPULAR_SUBREDDITS } from "@/hooks/use-subreddit-history";
@@ -18,7 +18,6 @@ import { sharePost } from "@/lib/share";
 import { downloadMedia } from "@/lib/download";
 import { usePostSearch } from "@/hooks/use-post-search";
 import { useGridDensity, DENSITY_CONFIG } from "@/hooks/use-grid-density";
-import { useCollections, CollectionPost } from "@/hooks/use-collections";
 import { useSettings } from "@/hooks/use-settings";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { SettingsModal } from "@/components/settings-modal";
@@ -475,18 +474,6 @@ export default function Home() {
       setDensity(settings.gridDensity);
     }
   }, [settings.gridDensity, density, setDensity]);
-
-  const {
-    collections,
-    createCollection,
-    addPostToCollection,
-    removePostFromCollection,
-    isPostInCollection,
-    getCollectionsForPost
-  } = useCollections();
-  const [showCollectionsModal, setShowCollectionsModal] = useState(false);
-  const [collectionTargetPost, setCollectionTargetPost] = useState<RedditPost | null>(null);
-  const [newCollectionName, setNewCollectionName] = useState('');
 
   // --- Cache ---
   const apiCache = useRef(new Map<CacheKey, CachedRedditResponse>()).current;
@@ -1195,18 +1182,6 @@ export default function Home() {
                               </>
                             )}
                         </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-sm active:scale-95 transition-transform"
-                            onClick={() => {
-                              setCollectionTargetPost(null);
-                              setShowCollectionsModal(true);
-                            }}
-                        >
-                            <Folder className="h-4 w-4 mr-2" />
-                            Collections ({collections.length})
-                        </Button>
                     </div>
                 </CollapsibleContent>
             </Collapsible>
@@ -1406,22 +1381,6 @@ export default function Home() {
               <DialogTitle className="sr-only"> Expanded view: {selectedPost?.title || 'Reddit Post'} </DialogTitle>
               <DialogDescription className="sr-only"> Expanded view of Reddit post: {selectedPost?.title || 'Content'}... </DialogDescription>
 
-              {/* Collection Button */}
-              <div className="absolute top-2 left-1/2 transform -translate-x-1/2 z-50">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-full text-white bg-black/60 hover:bg-black/80"
-                  onClick={() => {
-                    setCollectionTargetPost(selectedPost);
-                    setShowCollectionsModal(true);
-                  }}
-                  title="Add to collection"
-                >
-                  <FolderPlus className="h-4 w-4" />
-                </Button>
-              </div>
-
               {selectedPost ? (
                  <MediaCarousel
                     mediaUrls={selectedPost.mediaUrls}
@@ -1495,114 +1454,6 @@ export default function Home() {
           <div className="flex justify-end mt-4">
             <Button variant="outline" size="sm" onClick={() => setShowKeyboardShortcuts(false)}>
               Got it
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Collections Modal */}
-      <Dialog open={showCollectionsModal} onOpenChange={setShowCollectionsModal}>
-        <DialogContent className="max-w-md">
-          <DialogTitle className="flex items-center gap-2">
-            <Folder className="h-5 w-5" />
-            {collectionTargetPost ? 'Add to Collection' : 'My Collections'}
-          </DialogTitle>
-          <DialogDescription>
-            {collectionTargetPost
-              ? `Choose a collection to add "${collectionTargetPost.title.slice(0, 30)}${collectionTargetPost.title.length > 30 ? '...' : ''}"`
-              : 'Manage your saved post collections'}
-          </DialogDescription>
-          <div className="space-y-4 mt-4">
-            {/* Create new collection */}
-            <div className="flex gap-2">
-              <Input
-                placeholder="New collection name..."
-                value={newCollectionName}
-                onChange={(e) => setNewCollectionName(e.target.value)}
-                className="flex-grow"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && newCollectionName.trim()) {
-                    createCollection(newCollectionName.trim());
-                    setNewCollectionName('');
-                    toast({ description: `Collection "${newCollectionName}" created` });
-                  }
-                }}
-              />
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => {
-                  if (newCollectionName.trim()) {
-                    createCollection(newCollectionName.trim());
-                    setNewCollectionName('');
-                    toast({ description: `Collection "${newCollectionName}" created` });
-                  }
-                }}
-                disabled={!newCollectionName.trim()}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {/* List of collections */}
-            <div className="max-h-64 overflow-y-auto space-y-2">
-              {collections.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No collections yet. Create one above!
-                </p>
-              ) : (
-                collections.map((collection) => {
-                  const isInCollection = collectionTargetPost
-                    ? isPostInCollection(collection.id, collectionTargetPost.postId)
-                    : false;
-                  return (
-                    <div
-                      key={collection.id}
-                      className={cn(
-                        "flex items-center justify-between p-3 rounded-lg border transition-colors",
-                        collectionTargetPost && "hover:bg-accent cursor-pointer",
-                        isInCollection && "border-green-500 bg-green-500/10"
-                      )}
-                      onClick={() => {
-                        if (collectionTargetPost) {
-                          if (isInCollection) {
-                            removePostFromCollection(collection.id, collectionTargetPost.postId);
-                            toast({ description: `Removed from "${collection.name}"` });
-                          } else {
-                            addPostToCollection(collection.id, {
-                              title: collectionTargetPost.title,
-                              mediaUrls: collectionTargetPost.mediaUrls,
-                              fullQualityUrls: collectionTargetPost.fullQualityUrls || collectionTargetPost.mediaUrls,
-                              subreddit: collectionTargetPost.subreddit,
-                              postId: collectionTargetPost.postId,
-                            });
-                            toast({ description: `Added to "${collection.name}"` });
-                          }
-                        }
-                      }}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Folder className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">{collection.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          ({collection.posts.length} posts)
-                        </span>
-                      </div>
-                      {collectionTargetPost && isInCollection && (
-                        <span className="text-xs text-green-500">✓ Added</span>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-          <div className="flex justify-end mt-4">
-            <Button variant="outline" size="sm" onClick={() => {
-              setShowCollectionsModal(false);
-              setCollectionTargetPost(null);
-            }}>
-              {collectionTargetPost ? 'Done' : 'Close'}
             </Button>
           </div>
         </DialogContent>
