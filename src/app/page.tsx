@@ -764,10 +764,11 @@ export default function Home() {
     } catch (e) { if (e instanceof Error) { throw e; } else { throw new Error('An unexpected error occurred during the fetch process.'); } }
    }, [apiCache, toast, generateCacheKey]);
 
-   const fetchInitialPosts = useCallback(async () => {
+   const fetchInitialPosts = useCallback(async (inputOverride?: string) => {
      setShowFavoritesOnly(false); // Reset favorites filter when fetching new posts
      setShowSuggestions(false); // Hide suggestions when fetching
-     let subsToUse = parseSubreddits(subredditInput);
+     const inputToUse = inputOverride ?? subredditInput;
+     let subsToUse = parseSubreddits(inputToUse);
 
      // Save searched subreddits to history
      subsToUse.forEach(sub => {
@@ -917,7 +918,13 @@ export default function Home() {
    }, [subredditInput, toast]);
 
    const handleLoadList = useCallback((listName: string) => {
-        if (listName && savedLists[listName]) { setSubredditInput(savedLists[listName]); setSelectedListName(listName); setTimeout(() => { fetchInitialPosts(); }, 0); }
+        if (listName && savedLists[listName]) {
+          const listValue = savedLists[listName];
+          setSubredditInput(listValue);
+          setSelectedListName(listName);
+          // Pass the list value directly to avoid stale state issue
+          fetchInitialPosts(listValue);
+        }
         else if (listName === "" || !savedLists[listName]) { setSelectedListName(""); }
    }, [savedLists, fetchInitialPosts]);
 
@@ -1046,7 +1053,7 @@ export default function Home() {
                      </div>
                    )}
                  </div>
-                 <Button onClick={fetchInitialPosts} disabled={isLoading} className="w-full sm:w-auto flex-shrink-0 active:scale-95 transition-transform">
+                 <Button onClick={() => fetchInitialPosts()} disabled={isLoading} className="w-full sm:w-auto flex-shrink-0 active:scale-95 transition-transform">
                      {isLoading && posts.length === 0 ? "Fetching..." : "Fetch"}
                  </Button>
              </div>
@@ -1212,7 +1219,7 @@ export default function Home() {
                <Button
                  variant="outline"
                  size="sm"
-                 onClick={fetchInitialPosts}
+                 onClick={() => fetchInitialPosts()}
                  disabled={isLoading}
                  className="text-xs"
                >
