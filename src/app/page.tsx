@@ -8,7 +8,21 @@ import { Button } from "@/components/ui/button";
 import { RedditPost, getPosts, SortType, TimeFrame } from "@/services/reddit";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Trash2, Save, X, Video, Copy as GalleryIcon, Filter, Loader2, ArrowUp, Heart } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trash2, Save, X, Video, Copy as GalleryIcon, Filter, Loader2, ArrowUp, Heart, Sun, Moon, ArrowUpCircle, MessageCircle, Share2, Download, EyeOff, Eye, TrendingUp, HelpCircle, Keyboard, Search, Grid3X3, LayoutGrid, Grid2X2, Play, Pause, FolderPlus, Folder, Plus, Settings } from "lucide-react";
+import { useTheme } from "@/hooks/use-theme";
+import { useNsfwFilter } from "@/hooks/use-nsfw-filter";
+import { useSubredditHistory, POPULAR_SUBREDDITS } from "@/hooks/use-subreddit-history";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { formatRelativeTime, formatNumber } from "@/lib/format-time";
+import { sharePost } from "@/lib/share";
+import { downloadMedia } from "@/lib/download";
+import { usePostSearch } from "@/hooks/use-post-search";
+import { useGridDensity, DENSITY_CONFIG } from "@/hooks/use-grid-density";
+import { useSlideshow } from "@/hooks/use-slideshow";
+import { useCollections, CollectionPost } from "@/hooks/use-collections";
+import { useSettings } from "@/hooks/use-settings";
+import { useFocusTrap } from "@/hooks/use-focus-trap";
+import { SettingsModal } from "@/components/settings-modal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -95,14 +109,17 @@ interface MediaCarouselProps {
   onToggleFavorite?: () => void;
   isFavorite?: boolean;
   onClose?: () => void;
+  onShare?: () => void;
+  onDownload?: () => void;
 }
 
 const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
     mediaUrls, fullQualityUrls, title, subreddit, postId, isFullScreen = false, isUnplayableVideoFormat = false,
-    onToggleFavorite, isFavorite = false, onClose
+    onToggleFavorite, isFavorite = false, onClose, onShare, onDownload
 }) => {
     // --- State and Refs ---
     const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+    const isMobile = useIsMobile();
     const containerRef = useRef<HTMLDivElement>(null);
     const touchStartX = useRef<number | null>(null);
     const touchEndX = useRef<number | null>(null);
@@ -222,18 +239,45 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
             {/* === Top Control Bar (Rendered only when fullscreen) === */}
             {isFullScreen && (
                 <div className="absolute top-0 left-0 right-0 z-40 p-2 bg-gradient-to-b from-black/60 via-black/40 to-transparent flex justify-between items-center">
-                    {/* Left side - Favorite Button */}
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 rounded-full text-white hover:bg-white/20 active:scale-90"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onToggleFavorite?.();
-                        }}
-                    >
-                        <Heart className={cn("h-5 w-5", isFavorite ? "fill-current" : "")} />
-                    </Button>
+                    {/* Left side - Favorite and Share Buttons */}
+                    <div className="flex items-center gap-1">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full text-white hover:bg-white/20 active:scale-90"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleFavorite?.();
+                            }}
+                            aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                        >
+                            <Heart className={cn("h-5 w-5", isFavorite ? "fill-current" : "")} />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full text-white hover:bg-white/20 active:scale-90"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onShare?.();
+                            }}
+                            aria-label="Share post"
+                        >
+                            <Share2 className="h-5 w-5" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full text-white hover:bg-white/20 active:scale-90"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onDownload?.();
+                            }}
+                            aria-label="Download media"
+                        >
+                            <Download className="h-5 w-5" />
+                        </Button>
+                    </div>
 
                     {/* Right side - Close Button */}
                     <DialogClose asChild>
@@ -295,12 +339,71 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
 
                  {isFullScreen && !isUnplayableVideoFormat && (
                      <div
-                        className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/70 via-black/40 to-transparent text-white p-4 z-30 pointer-events-none"
+                        className={cn(
+                          "absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/70 via-black/40 to-transparent text-white p-4 z-30 pointer-events-none",
+                          isMobile && "pb-20" // Extra padding for mobile action bar
+                        )}
                       >
                          <p className="text-base md:text-lg font-semibold">
                              {title} (From: <a href={`https://www.reddit.com/r/${subreddit}/comments/${postId}`} target="_blank" rel="noopener noreferrer" className="underline pointer-events-auto" onClick={(e) => e.stopPropagation()} > r/{subreddit} </a>)
                          </p>
                      </div>
+                 )}
+
+                 {/* === Mobile Bottom Action Bar === */}
+                 {isFullScreen && isMobile && (
+                   <div className="absolute bottom-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-sm border-t border-white/10">
+                     <div className="flex justify-around items-center py-3 px-4">
+                       <Button
+                         variant="ghost"
+                         size="icon"
+                         className="h-12 w-12 rounded-full text-white hover:bg-white/20 active:scale-90"
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           onToggleFavorite?.();
+                         }}
+                         aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                       >
+                         <Heart className={cn("h-6 w-6", isFavorite ? "fill-current text-pink-500" : "")} />
+                       </Button>
+                       <Button
+                         variant="ghost"
+                         size="icon"
+                         className="h-12 w-12 rounded-full text-white hover:bg-white/20 active:scale-90"
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           onShare?.();
+                         }}
+                         aria-label="Share post"
+                       >
+                         <Share2 className="h-6 w-6" />
+                       </Button>
+                       <Button
+                         variant="ghost"
+                         size="icon"
+                         className="h-12 w-12 rounded-full text-white hover:bg-white/20 active:scale-90"
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           onDownload?.();
+                         }}
+                         aria-label="Download media"
+                       >
+                         <Download className="h-6 w-6" />
+                       </Button>
+                       <Button
+                         variant="ghost"
+                         size="icon"
+                         className="h-12 w-12 rounded-full text-white hover:bg-white/20 active:scale-90"
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           onClose?.();
+                         }}
+                         aria-label="Close"
+                       >
+                         <X className="h-6 w-6" />
+                       </Button>
+                     </div>
+                   </div>
                  )}
             </div>
         </div>
@@ -348,6 +451,36 @@ export default function Home() {
   const [favoritesLoadComplete, setFavoritesLoadComplete] = useState(false);
 
   const { toast } = useToast();
+  const { theme, toggleTheme } = useTheme();
+  const { hideNsfw, toggleNsfwFilter } = useNsfwFilter();
+  const { history: subredditHistory, addToHistory, getSuggestions } = useSubredditHistory();
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+
+  // Centralized settings
+  const {
+    settings,
+    updateSetting,
+    resetSettings,
+    resolvedTheme,
+  } = useSettings();
+
+  // Phase 3 hooks
+  const { density, cycleDensity, config: densityConfig, gridStyle } = useGridDensity();
+  const {
+    collections,
+    createCollection,
+    addPostToCollection,
+    removePostFromCollection,
+    isPostInCollection,
+    getCollectionsForPost
+  } = useCollections();
+  const [showCollectionsModal, setShowCollectionsModal] = useState(false);
+  const [collectionTargetPost, setCollectionTargetPost] = useState<RedditPost | null>(null);
+  const [newCollectionName, setNewCollectionName] = useState('');
+  const [selectedPostIndex, setSelectedPostIndex] = useState(0);
 
   // --- Cache ---
   const apiCache = useRef(new Map<CacheKey, CachedRedditResponse>()).current;
@@ -357,15 +490,17 @@ export default function Home() {
       return `${sub}::${sort}::${timeKey}::${afterKey}`;
   };
 
-  // --- Filtered Posts ---
-  const postsToDisplay = useMemo(() => {
+  // --- Filtered Posts with Search ---
+  const basePosts = useMemo(() => {
+    let result: RedditPost[];
+
     if (!showFavoritesOnly) {
         // When showing all posts, return the fetched posts array directly
         // Ensure the isUnplayable flag from fetch is preserved
-        return posts.map(p => ({...p, isUnplayableVideoFormat: p.isUnplayableVideoFormat ?? false}));
+        result = posts.map(p => ({...p, isUnplayableVideoFormat: p.isUnplayableVideoFormat ?? false}));
     } else {
         // When showing only favorites, map the favorites map values
-        return Object.values(favorites).map((favInfo): RedditPost => {
+        result = Object.values(favorites).map((favInfo): RedditPost => {
             const thumbnailUrl = favInfo.thumbnailUrl;
             const urls = thumbnailUrl ? [thumbnailUrl] : [];
 
@@ -380,7 +515,32 @@ export default function Home() {
             };
         });
     }
-  }, [posts, favorites, showFavoritesOnly]);
+
+    // Filter out NSFW posts if hideNsfw is enabled
+    if (hideNsfw) {
+      result = result.filter(p => !p.isNsfw);
+    }
+
+    return result;
+  }, [posts, favorites, showFavoritesOnly, hideNsfw]);
+
+  // Apply search filter
+  const { searchQuery, setSearchQuery, filteredPosts: postsToDisplay, clearSearch, highlightMatch } = usePostSearch(basePosts);
+
+  // Slideshow navigation handler (must be after postsToDisplay is defined)
+  const handleNextPost = useCallback(() => {
+    if (postsToDisplay.length === 0) return;
+    setSelectedPostIndex(prev => {
+      const nextIndex = (prev + 1) % postsToDisplay.length;
+      setSelectedPost(postsToDisplay[nextIndex]);
+      return nextIndex;
+    });
+  }, [postsToDisplay]);
+
+  const slideshow = useSlideshow({
+    onNext: handleNextPost,
+    initialInterval: 5000,
+  });
 
   // --- Load/Save Saved Lists (IndexedDB) ---
   useEffect(() => {
@@ -615,7 +775,15 @@ export default function Home() {
 
    const fetchInitialPosts = useCallback(async () => {
      setShowFavoritesOnly(false); // Reset favorites filter when fetching new posts
+     setShowSuggestions(false); // Hide suggestions when fetching
      let subsToUse = parseSubreddits(subredditInput);
+
+     // Save searched subreddits to history
+     subsToUse.forEach(sub => {
+       if (isValidSubreddit(sub)) {
+         addToHistory(sub);
+       }
+     });
      if (subsToUse.length === 0) {
         setError("Please enter at least one valid subreddit name.");
         setPosts([]); setFetchInitiated(false); setHasMore(false); return;
@@ -699,8 +867,56 @@ export default function Home() {
 
 
   // --- Event Handlers ---
-  const handleThumbnailClick = useCallback((post: RedditPost) => { setSelectedPost(post); setIsDialogOpen(true); }, []);
-  const handleDialogClose = useCallback(() => { setIsDialogOpen(false); setTimeout(() => { setSelectedPost(null); }, 300); }, []);
+  const handleThumbnailClick = useCallback((post: RedditPost, index: number) => {
+    setSelectedPost(post);
+    setSelectedPostIndex(index);
+    setIsDialogOpen(true);
+  }, []);
+
+  const handleDialogClose = useCallback(() => {
+    setIsDialogOpen(false);
+    slideshow.pause(); // Stop slideshow when closing
+    setTimeout(() => { setSelectedPost(null); }, 300);
+  }, [slideshow]);
+
+  // --- Share Handler ---
+  const handleShare = useCallback(async (post: RedditPost) => {
+    const result = await sharePost({
+      title: post.title,
+      subreddit: post.subreddit,
+      postId: post.postId,
+    });
+    if (result.shared) {
+      if (result.method === 'clipboard') {
+        toast({ description: "Link copied to clipboard" });
+      }
+    } else {
+      toast({ variant: "destructive", description: "Failed to share" });
+    }
+  }, [toast]);
+
+  // --- Download Handler ---
+  const handleDownload = useCallback(async (post: RedditPost) => {
+    const urlToDownload = post.fullQualityUrls?.[0] || post.mediaUrls?.[0];
+    if (!urlToDownload) {
+      toast({ variant: "destructive", description: "No media to download" });
+      return;
+    }
+
+    toast({ description: "Starting download..." });
+
+    const success = await downloadMedia({
+      url: urlToDownload,
+      subreddit: post.subreddit,
+      postId: post.postId,
+    });
+
+    if (success) {
+      toast({ description: "Download complete" });
+    } else {
+      toast({ variant: "destructive", description: "Download failed" });
+    }
+  }, [toast]);
 
   // --- Saved Lists Handlers ---
    const handleSaveList = useCallback(() => {
@@ -732,8 +948,13 @@ export default function Home() {
     });
 };
 
-   // --- Masonry Breakpoint Configuration ---
-   const breakpointColumnsObj = { default: 6, 1280: 5, 1024: 4, 768: 3 };
+   // --- Masonry Breakpoint Configuration (uses grid density) ---
+   const breakpointColumnsObj = useMemo(() => ({
+     default: densityConfig.columns.wide,
+     1280: densityConfig.columns.desktop,
+     1024: densityConfig.columns.tablet,
+     768: densityConfig.columns.mobile
+   }), [densityConfig]);
 
    // --- Render ---
    const savedListNames = Object.keys(savedLists);
@@ -743,18 +964,123 @@ export default function Home() {
       {/* Header */}
       <header className="mb-6 flex-shrink-0">
         <div className="max-w-xl mx-auto space-y-3">
+            {/* Header Controls */}
+            <div className="flex justify-end gap-1" role="toolbar" aria-label="Main controls">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowSettings(true)}
+                aria-label="Open settings"
+                className="h-9 w-9 rounded-full active:scale-95 transition-transform"
+              >
+                <Settings className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowKeyboardShortcuts(true)}
+                aria-label="Show keyboard shortcuts"
+                className="h-9 w-9 rounded-full active:scale-95 transition-transform"
+              >
+                <Keyboard className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleTheme}
+                aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                aria-pressed={theme === 'dark'}
+                className="h-9 w-9 rounded-full active:scale-95 transition-transform"
+              >
+                {theme === 'dark' ? (
+                  <Sun className="h-5 w-5" />
+                ) : (
+                  <Moon className="h-5 w-5" />
+                )}
+              </Button>
+            </div>
             {/* Input and Fetch Button */}
             <div className="flex flex-col sm:flex-row items-stretch gap-2">
-                 <Input
-                    type="text" aria-label="Enter subreddit names separated by commas"
-                    placeholder="Enter subreddits..." value={subredditInput}
-                    onChange={(e) => setSubredditInput(e.target.value)}
-                    className="flex-grow text-base"
-                    onKeyDown={(e) => { if (e.key === 'Enter' && !isLoading) fetchInitialPosts(); }}
-                 />
+                 <div className="relative flex-grow">
+                   <Input
+                      type="text" aria-label="Enter subreddit names separated by commas"
+                      placeholder="Enter subreddits..." value={subredditInput}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSubredditInput(value);
+                        // Get the last word being typed for suggestions
+                        const parts = value.split(',');
+                        const lastPart = parts[parts.length - 1].trim();
+                        if (lastPart.length >= 2) {
+                          const matches = getSuggestions(lastPart);
+                          setSuggestions(matches.slice(0, 5));
+                          setShowSuggestions(matches.length > 0);
+                        } else {
+                          setShowSuggestions(false);
+                        }
+                      }}
+                      onFocus={() => {
+                        const parts = subredditInput.split(',');
+                        const lastPart = parts[parts.length - 1].trim();
+                        if (lastPart.length >= 2) {
+                          const matches = getSuggestions(lastPart);
+                          setSuggestions(matches.slice(0, 5));
+                          setShowSuggestions(matches.length > 0);
+                        }
+                      }}
+                      onBlur={() => {
+                        // Delay hiding to allow click on suggestion
+                        setTimeout(() => setShowSuggestions(false), 150);
+                      }}
+                      className="flex-grow text-base w-full"
+                      onKeyDown={(e) => { if (e.key === 'Enter' && !isLoading) fetchInitialPosts(); }}
+                   />
+                   {/* Suggestions Dropdown */}
+                   {showSuggestions && suggestions.length > 0 && (
+                     <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-popover border rounded-md shadow-lg">
+                       {suggestions.map((suggestion) => (
+                         <button
+                           key={suggestion}
+                           className="w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors first:rounded-t-md last:rounded-b-md"
+                           onMouseDown={(e) => {
+                             e.preventDefault();
+                             // Replace the last part with the suggestion
+                             const parts = subredditInput.split(',');
+                             parts[parts.length - 1] = ' ' + suggestion;
+                             setSubredditInput(parts.join(',').replace(/^,\s*/, '').trim());
+                             setShowSuggestions(false);
+                           }}
+                         >
+                           r/{suggestion}
+                         </button>
+                       ))}
+                     </div>
+                   )}
+                 </div>
                  <Button onClick={fetchInitialPosts} disabled={isLoading} className="w-full sm:w-auto flex-shrink-0 active:scale-95 transition-transform">
                      {isLoading && posts.length === 0 ? "Fetching..." : "Fetch"}
                  </Button>
+             </div>
+             {/* Popular Subreddits */}
+             <div className="flex flex-wrap justify-center gap-1.5">
+               <span className="flex items-center text-xs text-muted-foreground mr-1">
+                 <TrendingUp className="h-3 w-3 mr-1" />
+                 Popular:
+               </span>
+               {POPULAR_SUBREDDITS.slice(0, 6).map((sub) => (
+                 <Button
+                   key={sub}
+                   variant="ghost"
+                   size="sm"
+                   className="h-6 px-2 text-xs hover:bg-accent"
+                   onClick={() => {
+                     setSubredditInput(sub);
+                     setTimeout(() => fetchInitialPosts(), 0);
+                   }}
+                 >
+                   r/{sub}
+                 </Button>
+               ))}
              </div>
              {/* Collapsible Controls */}
             <Collapsible open={isControlsOpen} onOpenChange={setIsControlsOpen}>
@@ -786,8 +1112,56 @@ export default function Home() {
                         </RadioGroup>
                         {sortType === 'top' && ( <Select value={timeFrame} onValueChange={(value) => {if(!isLoading) setTimeFrame(value as TimeFrame)}} disabled={isLoading} > <SelectTrigger className="w-[180px]" aria-label="Time frame"> <SelectValue placeholder="Time frame" /> </SelectTrigger> <SelectContent> <SelectItem value="day">Today</SelectItem> <SelectItem value="week">This Week</SelectItem> <SelectItem value="month">This Month</SelectItem> <SelectItem value="year">This Year</SelectItem> <SelectItem value="all">All Time</SelectItem> </SelectContent> </Select> )}
                     </div>
-                    {/* Favorites Filter Toggle */}
-                    <div className="flex justify-center pt-2">
+                    {/* Search Posts */}
+                    {postsToDisplay.length > 0 && (
+                      <div className="relative pt-2">
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex-grow">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              type="text"
+                              placeholder="Search loaded posts..."
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                              className="pl-9 text-sm"
+                            />
+                            {searchQuery && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6"
+                                onClick={clearSearch}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                        {searchQuery && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Found {postsToDisplay.length} matching posts
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {/* Grid Density, Favorites and NSFW Filter Toggles */}
+                    <div className="flex flex-wrap justify-center gap-2 pt-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-sm active:scale-95 transition-transform"
+                            onClick={cycleDensity}
+                            title={`Grid: ${densityConfig.label}`}
+                        >
+                            {density === 'compact' ? (
+                              <Grid3X3 className="h-4 w-4 mr-2" />
+                            ) : density === 'comfortable' ? (
+                              <LayoutGrid className="h-4 w-4 mr-2" />
+                            ) : (
+                              <Grid2X2 className="h-4 w-4 mr-2" />
+                            )}
+                            {densityConfig.label}
+                        </Button>
                         <Button
                             variant={showFavoritesOnly ? "default" : "outline"}
                             size="sm"
@@ -804,39 +1178,142 @@ export default function Home() {
                             )} />
                             {showFavoritesOnly ? "Showing" : "Show"} Favorites ({Object.keys(favorites).length})
                         </Button>
+                        <Button
+                            variant={hideNsfw ? "outline" : "default"}
+                            size="sm"
+                            className={cn(
+                                "text-sm active:scale-95 transition-transform",
+                                !hideNsfw && "bg-orange-600 hover:bg-orange-700"
+                            )}
+                            onClick={toggleNsfwFilter}
+                        >
+                            {hideNsfw ? (
+                              <>
+                                <EyeOff className="h-4 w-4 mr-2" />
+                                NSFW Hidden
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="h-4 w-4 mr-2" />
+                                NSFW Visible
+                              </>
+                            )}
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-sm active:scale-95 transition-transform"
+                            onClick={() => {
+                              setCollectionTargetPost(null);
+                              setShowCollectionsModal(true);
+                            }}
+                        >
+                            <Folder className="h-4 w-4 mr-2" />
+                            Collections ({collections.length})
+                        </Button>
                     </div>
                 </CollapsibleContent>
             </Collapsible>
          </div>
-         {/* Error Message */}
-         {error && <p className="text-red-500 mt-2 text-center text-sm">{error}</p>}
+         {/* Error Message - Improved */}
+         {error && (
+           <div className="mt-4 p-4 rounded-lg bg-destructive/10 border border-destructive/20 max-w-md mx-auto">
+             <p className="text-destructive text-center text-sm font-medium mb-3">{error}</p>
+             <div className="flex justify-center gap-2">
+               <Button
+                 variant="outline"
+                 size="sm"
+                 onClick={fetchInitialPosts}
+                 disabled={isLoading}
+                 className="text-xs"
+               >
+                 {isLoading ? (
+                   <>
+                     <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                     Retrying...
+                   </>
+                 ) : (
+                   'Try Again'
+                 )}
+               </Button>
+             </div>
+           </div>
+         )}
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-grow mt-2">
+      <main className="flex-grow mt-2" role="main" aria-label="Reddit posts gallery">
+        {/* Screen reader live region for status updates */}
+        <div className="sr-only" aria-live="polite" aria-atomic="true">
+          {isLoading && posts.length === 0 ? 'Loading posts...' : ''}
+          {isLoading && posts.length > 0 ? 'Loading more posts...' : ''}
+          {!isLoading && postsToDisplay.length > 0 ? `Showing ${postsToDisplay.length} posts` : ''}
+          {!isLoading && fetchInitiated && postsToDisplay.length === 0 ? 'No posts found' : ''}
+        </div>
+
         {/* Initial Loading Skeletons */}
         {isLoading && posts.length === 0 && !error && (
             <Masonry breakpointCols={breakpointColumnsObj} className="my-masonry-grid flex gap-1.5" columnClassName="my-masonry-grid_column">
                  {Array.from({ length: 18 }).map((_, index) => ( <Skeleton key={`skeleton-${index}`} className="h-64 w-full mb-1.5" /> ))}
             </Masonry>
         )}
-        {/* No Posts Message */}
-        {fetchInitiated && postsToDisplay.length === 0 && !isLoading && !error && ( <p className="text-center text-muted-foreground mt-10">No posts found.</p> )}
+        {/* No Posts Message - Improved */}
+        {fetchInitiated && postsToDisplay.length === 0 && !isLoading && !error && (
+          <div className="text-center mt-10 space-y-4">
+            <p className="text-muted-foreground text-lg">No posts found</p>
+            <div className="text-sm text-muted-foreground/80 max-w-md mx-auto space-y-2">
+              <p>Try the following:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Check the subreddit name spelling</li>
+                <li>Try a different time frame for &quot;Top&quot; posts</li>
+                <li>Some subreddits may have less media content</li>
+              </ul>
+            </div>
+            <div className="flex flex-wrap justify-center gap-2 mt-4">
+              <p className="text-xs text-muted-foreground w-full">Popular subreddits:</p>
+              {['pics', 'aww', 'funny', 'memes', 'earthporn'].map((sub) => (
+                <Button
+                  key={sub}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSubredditInput(sub);
+                    setTimeout(() => fetchInitialPosts(), 0);
+                  }}
+                  className="text-xs"
+                >
+                  r/{sub}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
         {/* Posts Grid */}
         {postsToDisplay.length > 0 && (
-          <Masonry breakpointCols={breakpointColumnsObj} className="my-masonry-grid flex gap-1.5" columnClassName="my-masonry-grid_column">
-            {postsToDisplay.map((post) => {
+          <Masonry breakpointCols={breakpointColumnsObj} className="my-masonry-grid flex" columnClassName="my-masonry-grid_column" style={gridStyle} role="list" aria-label="Media posts">
+            {postsToDisplay.map((post, index) => {
                 const firstUrl=post?.mediaUrls?.[0];
                 const isVideoPost=firstUrl&&firstUrl.endsWith('.mp4');
                 const isGalleryPost=post?.mediaUrls?.length>1;
                 const isUnplayable = post.isUnplayableVideoFormat ?? false;
+                const mediaType = isVideoPost ? 'video' : isGalleryPost ? 'gallery' : 'image';
                 return (
-                <div key={`${post.subreddit}-${post.postId}`} 
-                     ref={!showFavoritesOnly && postsToDisplay[postsToDisplay.length-1]===post ? lastPostRef : null} 
-                     className="mb-1.5">
-                 <Card onClick={()=> !isUnplayable && handleThumbnailClick(post)}
+                <div key={`${post.subreddit}-${post.postId}`}
+                     ref={!showFavoritesOnly && postsToDisplay[postsToDisplay.length-1]===post ? lastPostRef : null}
+                     className="mb-1.5" style={{ marginBottom: `${densityConfig.gap}px` }}
+                     role="listitem">
+                 <Card onClick={()=> !isUnplayable && handleThumbnailClick(post, index)}
+                       onKeyDown={(e) => {
+                         if (!isUnplayable && (e.key === 'Enter' || e.key === ' ')) {
+                           e.preventDefault();
+                           handleThumbnailClick(post, index);
+                         }
+                       }}
+                       tabIndex={isUnplayable ? -1 : 0}
+                       role="button"
+                       aria-label={`${post.title} - ${mediaType} from r/${post.subreddit}${post.ups ? `, ${formatNumber(post.ups)} upvotes` : ''}${favorites[post.postId] ? ', favorited' : ''}`}
                        className={cn(
-                            "group relative overflow-hidden bg-gray-100 dark:bg-gray-800 flex items-center justify-center transition-all duration-200",
+                            "group relative overflow-hidden bg-gray-100 dark:bg-gray-800 flex items-center justify-center transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
                             !isUnplayable && "hover:shadow-lg hover:scale-[1.02] active:scale-95 cursor-pointer",
                             isUnplayable && "cursor-default"
                        )}>
@@ -861,6 +1338,26 @@ export default function Home() {
                              <GalleryIcon className="h-3 w-3"/>}
                         </div>
                      )}
+                     {/* Metadata Overlay */}
+                     <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/70 via-black/40 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                       <div className="flex items-center justify-between text-white text-xs">
+                         <div className="flex items-center gap-2">
+                           <span className="flex items-center gap-0.5" title="Upvotes">
+                             <ArrowUpCircle className="h-3 w-3" />
+                             {formatNumber(post.ups ?? 0)}
+                           </span>
+                           <span className="flex items-center gap-0.5" title="Comments">
+                             <MessageCircle className="h-3 w-3" />
+                             {formatNumber(post.numComments ?? 0)}
+                           </span>
+                         </div>
+                         {post.createdUtc && (
+                           <span className="text-white/80" title={new Date((post.createdUtc ?? 0) * 1000).toLocaleString()}>
+                             {formatRelativeTime(post.createdUtc)}
+                           </span>
+                         )}
+                       </div>
+                     </div>
                      {/* Grid Item Media Carousel */}
                      <MediaCarousel
                         mediaUrls={post.mediaUrls}
@@ -913,6 +1410,44 @@ export default function Home() {
               <DialogTitle className="sr-only"> Expanded view: {selectedPost?.title || 'Reddit Post'} </DialogTitle>
               <DialogDescription className="sr-only"> Expanded view of Reddit post: {selectedPost?.title || 'Content'}... </DialogDescription>
 
+              {/* Slideshow Controls */}
+              <div className="absolute top-2 left-1/2 transform -translate-x-1/2 z-50 flex items-center gap-2 bg-black/60 rounded-full px-3 py-1.5">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-full text-white hover:bg-white/20"
+                  onClick={slideshow.toggle}
+                  title={slideshow.isPlaying ? "Pause slideshow" : "Start slideshow"}
+                >
+                  {slideshow.isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                </Button>
+                <span className="text-white text-xs">
+                  {selectedPostIndex + 1} / {postsToDisplay.length}
+                </span>
+                <select
+                  className="bg-transparent text-white text-xs border-none outline-none cursor-pointer"
+                  value={slideshow.interval}
+                  onChange={(e) => slideshow.setInterval(Number(e.target.value))}
+                  title="Slideshow speed"
+                >
+                  <option value={3000} className="bg-black">3s</option>
+                  <option value={5000} className="bg-black">5s</option>
+                  <option value={10000} className="bg-black">10s</option>
+                </select>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-full text-white hover:bg-white/20"
+                  onClick={() => {
+                    setCollectionTargetPost(selectedPost);
+                    setShowCollectionsModal(true);
+                  }}
+                  title="Add to collection"
+                >
+                  <FolderPlus className="h-4 w-4" />
+                </Button>
+              </div>
+
               {selectedPost ? (
                  <MediaCarousel
                     mediaUrls={selectedPost.mediaUrls}
@@ -925,6 +1460,8 @@ export default function Home() {
                     onToggleFavorite={() => toggleFavorite(selectedPost)}
                     isFavorite={!!favorites[selectedPost.postId]}
                     onClose={handleDialogClose}
+                    onShare={() => handleShare(selectedPost)}
+                    onDownload={() => handleDownload(selectedPost)}
                  />
               ) : ( <div className="text-white text-xl">Loading content...</div> )}
 
@@ -935,6 +1472,177 @@ export default function Home() {
            {/* *** End Inner Wrapper *** */}
         </DialogContent>
       </Dialog>
+
+      {/* Keyboard Shortcuts Dialog */}
+      <Dialog open={showKeyboardShortcuts} onOpenChange={setShowKeyboardShortcuts}>
+        <DialogContent className="max-w-md">
+          <DialogTitle className="flex items-center gap-2">
+            <Keyboard className="h-5 w-5" />
+            Keyboard Shortcuts
+          </DialogTitle>
+          <DialogDescription>
+            Use these shortcuts to navigate faster
+          </DialogDescription>
+          <div className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <h4 className="font-medium text-sm text-muted-foreground">Fullscreen View</h4>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-center gap-2">
+                  <kbd className="px-2 py-1 text-xs font-mono bg-muted rounded">←</kbd>
+                  <span className="text-sm">Previous image</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <kbd className="px-2 py-1 text-xs font-mono bg-muted rounded">→</kbd>
+                  <span className="text-sm">Next image</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <kbd className="px-2 py-1 text-xs font-mono bg-muted rounded">Esc</kbd>
+                  <span className="text-sm">Close fullscreen</span>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h4 className="font-medium text-sm text-muted-foreground">Search</h4>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-center gap-2">
+                  <kbd className="px-2 py-1 text-xs font-mono bg-muted rounded">Enter</kbd>
+                  <span className="text-sm">Fetch posts</span>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h4 className="font-medium text-sm text-muted-foreground">Mobile Gestures</h4>
+              <div className="space-y-1 text-sm text-muted-foreground">
+                <p>• Swipe left/right to navigate images</p>
+                <p>• Swipe up to close fullscreen</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end mt-4">
+            <Button variant="outline" size="sm" onClick={() => setShowKeyboardShortcuts(false)}>
+              Got it
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Collections Modal */}
+      <Dialog open={showCollectionsModal} onOpenChange={setShowCollectionsModal}>
+        <DialogContent className="max-w-md">
+          <DialogTitle className="flex items-center gap-2">
+            <Folder className="h-5 w-5" />
+            {collectionTargetPost ? 'Add to Collection' : 'My Collections'}
+          </DialogTitle>
+          <DialogDescription>
+            {collectionTargetPost
+              ? `Choose a collection to add "${collectionTargetPost.title.slice(0, 30)}${collectionTargetPost.title.length > 30 ? '...' : ''}"`
+              : 'Manage your saved post collections'}
+          </DialogDescription>
+          <div className="space-y-4 mt-4">
+            {/* Create new collection */}
+            <div className="flex gap-2">
+              <Input
+                placeholder="New collection name..."
+                value={newCollectionName}
+                onChange={(e) => setNewCollectionName(e.target.value)}
+                className="flex-grow"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newCollectionName.trim()) {
+                    createCollection(newCollectionName.trim());
+                    setNewCollectionName('');
+                    toast({ description: `Collection "${newCollectionName}" created` });
+                  }
+                }}
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  if (newCollectionName.trim()) {
+                    createCollection(newCollectionName.trim());
+                    setNewCollectionName('');
+                    toast({ description: `Collection "${newCollectionName}" created` });
+                  }
+                }}
+                disabled={!newCollectionName.trim()}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* List of collections */}
+            <div className="max-h-64 overflow-y-auto space-y-2">
+              {collections.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No collections yet. Create one above!
+                </p>
+              ) : (
+                collections.map((collection) => {
+                  const isInCollection = collectionTargetPost
+                    ? isPostInCollection(collection.id, collectionTargetPost.postId)
+                    : false;
+                  return (
+                    <div
+                      key={collection.id}
+                      className={cn(
+                        "flex items-center justify-between p-3 rounded-lg border transition-colors",
+                        collectionTargetPost && "hover:bg-accent cursor-pointer",
+                        isInCollection && "border-green-500 bg-green-500/10"
+                      )}
+                      onClick={() => {
+                        if (collectionTargetPost) {
+                          if (isInCollection) {
+                            removePostFromCollection(collection.id, collectionTargetPost.postId);
+                            toast({ description: `Removed from "${collection.name}"` });
+                          } else {
+                            addPostToCollection(collection.id, {
+                              title: collectionTargetPost.title,
+                              mediaUrls: collectionTargetPost.mediaUrls,
+                              fullQualityUrls: collectionTargetPost.fullQualityUrls || collectionTargetPost.mediaUrls,
+                              subreddit: collectionTargetPost.subreddit,
+                              postId: collectionTargetPost.postId,
+                            });
+                            toast({ description: `Added to "${collection.name}"` });
+                          }
+                        }
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Folder className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">{collection.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          ({collection.posts.length} posts)
+                        </span>
+                      </div>
+                      {collectionTargetPost && isInCollection && (
+                        <span className="text-xs text-green-500">✓ Added</span>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+          <div className="flex justify-end mt-4">
+            <Button variant="outline" size="sm" onClick={() => {
+              setShowCollectionsModal(false);
+              setCollectionTargetPost(null);
+            }}>
+              {collectionTargetPost ? 'Done' : 'Close'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        settings={settings}
+        updateSetting={updateSetting}
+        resetSettings={resetSettings}
+        resolvedTheme={resolvedTheme}
+      />
 
       {/* Footer */}
       <footer className="mt-16 md:mt-24 text-center text-sm text-muted-foreground flex-shrink-0 pb-6">

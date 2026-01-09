@@ -12,6 +12,11 @@ export interface RedditPost {
     subreddit: string;
     postId: string;
     isUnplayableVideoFormat?: boolean;
+    // Metadata fields
+    ups?: number; // Upvotes
+    numComments?: number; // Number of comments
+    createdUtc?: number; // Unix timestamp
+    isNsfw?: boolean; // NSFW/adult content flag
 }
 export type SortType = 'hot' | 'top';
 export type TimeFrame = 'day' | 'week' | 'month' | 'year' | 'all';
@@ -290,6 +295,10 @@ export async function GET(request: NextRequest) {
                         subreddit: postData.subreddit || subreddit,
                         postId: postData.id,
                         isUnplayableVideoFormat: isUnplayableVideo,
+                        ups: postData.ups ?? 0,
+                        numComments: postData.num_comments ?? 0,
+                        createdUtc: postData.created_utc ?? 0,
+                        isNsfw: postData.over_18 ?? false,
                     };
                 }
                 return null;

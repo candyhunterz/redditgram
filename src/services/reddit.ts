@@ -8,6 +8,11 @@ export interface RedditPost {
     subreddit: string;
     postId: string;
     isUnplayableVideoFormat?: boolean;
+    // Metadata fields
+    ups?: number; // Upvotes
+    numComments?: number; // Number of comments
+    createdUtc?: number; // Unix timestamp
+    isNsfw?: boolean; // NSFW/adult content flag
 }
 export type SortType = 'hot' | 'top';
 export type TimeFrame = 'day' | 'week' | 'month' | 'year' | 'all';
