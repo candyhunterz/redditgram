@@ -1261,19 +1261,6 @@ export default function Home() {
                             isUnplayable && "cursor-default"
                        )}>
                      {/* Indicators */}
-                     <div className="absolute top-1 left-1 z-20">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 rounded-full bg-black/40 text-white hover:bg-black/60 hover:text-white active:scale-90"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleFavorite(post);
-                          }}
-                        >
-                          <Heart className={cn("h-4 w-4", favorites[post.postId] ? "fill-current" : "")} />
-                        </Button>
-                     </div>
                      {(isVideoPost || isGalleryPost || isUnplayable) && (
                         <div className="absolute top-1 right-1 z-20 p-1 rounded-full bg-black/40 text-white transition-opacity opacity-70 group-hover:opacity-100">
                             {isUnplayable ? <Video className="h-3 w-3 opacity-70"/> :
