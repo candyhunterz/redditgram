@@ -8,8 +8,6 @@ export type Theme = 'light' | 'dark' | 'system'
 export interface Settings {
   theme: Theme
   gridDensity: GridDensity
-  nsfwEnabled: boolean
-  nsfwBlurred: boolean
   keyboardShortcutsEnabled: boolean
   autoplayVideos: boolean
   showMetadata: boolean
@@ -18,8 +16,6 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
   gridDensity: 'comfortable',
-  nsfwEnabled: false,
-  nsfwBlurred: true,
   keyboardShortcutsEnabled: true,
   autoplayVideos: true,
   showMetadata: true,

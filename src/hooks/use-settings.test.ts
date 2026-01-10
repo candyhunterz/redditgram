@@ -50,7 +50,6 @@ describe('useSettings', () => {
     const savedSettings: Partial<Settings> = {
       theme: 'dark',
       gridDensity: 'compact',
-      nsfwEnabled: true,
     }
     localStorageMock.getItem.mockReturnValueOnce(JSON.stringify(savedSettings))
 
@@ -58,7 +57,6 @@ describe('useSettings', () => {
 
     expect(result.current.settings.theme).toBe('dark')
     expect(result.current.settings.gridDensity).toBe('compact')
-    expect(result.current.settings.nsfwEnabled).toBe(true)
   })
 
   it('should merge partial saved settings with defaults', () => {
@@ -93,13 +91,11 @@ describe('useSettings', () => {
       result.current.updateSettings({
         theme: 'light',
         gridDensity: 'spacious',
-        nsfwEnabled: true,
       })
     })
 
     expect(result.current.settings.theme).toBe('light')
     expect(result.current.settings.gridDensity).toBe('spacious')
-    expect(result.current.settings.nsfwEnabled).toBe(true)
   })
 
   it('should reset all settings to defaults', () => {
@@ -110,7 +106,6 @@ describe('useSettings', () => {
       result.current.updateSettings({
         theme: 'dark',
         gridDensity: 'compact',
-        nsfwEnabled: true,
       })
     })
 

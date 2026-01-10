@@ -157,63 +157,6 @@ export function SettingsModal({
             </div>
           </section>
 
-          {/* Content Filters Section */}
-          <section aria-labelledby="filters-heading">
-            <h3 id="filters-heading" className="text-sm font-medium mb-3">
-              Content Filters
-            </h3>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="nsfw-toggle" className="text-sm cursor-pointer">
-                  Show NSFW content
-                </Label>
-                <button
-                  id="nsfw-toggle"
-                  role="switch"
-                  aria-checked={settings.nsfwEnabled}
-                  aria-label="Show NSFW content"
-                  onClick={() => updateSetting('nsfwEnabled', !settings.nsfwEnabled)}
-                  className={cn(
-                    "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-                    settings.nsfwEnabled ? "bg-orange-500" : "bg-muted"
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
-                      settings.nsfwEnabled ? "translate-x-6" : "translate-x-1"
-                    )}
-                  />
-                </button>
-              </div>
-              {settings.nsfwEnabled && (
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="blur-toggle" className="text-sm cursor-pointer">
-                    Blur NSFW thumbnails
-                  </Label>
-                  <button
-                    id="blur-toggle"
-                    role="switch"
-                    aria-checked={settings.nsfwBlurred}
-                    aria-label="Blur NSFW thumbnails"
-                    onClick={() => updateSetting('nsfwBlurred', !settings.nsfwBlurred)}
-                    className={cn(
-                      "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-                      settings.nsfwBlurred ? "bg-primary" : "bg-muted"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
-                        settings.nsfwBlurred ? "translate-x-6" : "translate-x-1"
-                      )}
-                    />
-                  </button>
-                </div>
-              )}
-            </div>
-          </section>
-
           {/* Accessibility Section */}
           <section aria-labelledby="a11y-heading">
             <h3 id="a11y-heading" className="text-sm font-medium mb-3">

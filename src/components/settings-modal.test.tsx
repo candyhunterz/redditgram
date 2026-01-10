@@ -137,39 +137,6 @@ describe('SettingsModal', () => {
     expect(mockUpdateSetting).toHaveBeenCalledWith('gridDensity', 'compact')
   })
 
-  it('should display NSFW settings', () => {
-    render(
-      <SettingsModal
-        isOpen={true}
-        onClose={mockOnClose}
-        settings={mockSettings}
-        updateSetting={mockUpdateSetting}
-        resetSettings={mockResetSettings}
-        resolvedTheme="light"
-      />
-    )
-
-    expect(screen.getByText('Content Filters')).toBeInTheDocument()
-    expect(screen.getByLabelText('Show NSFW content')).toBeInTheDocument()
-  })
-
-  it('should call updateSetting when NSFW toggle is clicked', () => {
-    render(
-      <SettingsModal
-        isOpen={true}
-        onClose={mockOnClose}
-        settings={{ ...mockSettings, nsfwEnabled: false }}
-        updateSetting={mockUpdateSetting}
-        resetSettings={mockResetSettings}
-        resolvedTheme="light"
-      />
-    )
-
-    fireEvent.click(screen.getByLabelText('Show NSFW content'))
-
-    expect(mockUpdateSetting).toHaveBeenCalledWith('nsfwEnabled', true)
-  })
-
   it('should call resetSettings when reset button is clicked', () => {
     render(
       <SettingsModal

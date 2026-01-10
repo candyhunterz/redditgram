@@ -8,9 +8,8 @@ import { Button } from "@/components/ui/button";
 import { RedditPost, getPosts, SortType, TimeFrame } from "@/services/reddit";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Trash2, Save, X, Video, Copy as GalleryIcon, Filter, Loader2, ArrowUp, Heart, Sun, Moon, ArrowUpCircle, MessageCircle, Share2, Download, EyeOff, Eye, TrendingUp, HelpCircle, Keyboard, Search, Grid3X3, LayoutGrid, Grid2X2, Settings } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trash2, Save, X, Video, Copy as GalleryIcon, Filter, Loader2, ArrowUp, Heart, Sun, Moon, ArrowUpCircle, MessageCircle, Share2, Download, TrendingUp, HelpCircle, Keyboard, Search, Grid3X3, LayoutGrid, Grid2X2, Settings } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
-import { useNsfwFilter } from "@/hooks/use-nsfw-filter";
 import { useSubredditHistory, POPULAR_SUBREDDITS } from "@/hooks/use-subreddit-history";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { formatRelativeTime, formatNumber } from "@/lib/format-time";
@@ -450,7 +449,6 @@ export default function Home() {
 
   const { toast } = useToast();
   const { theme, toggleTheme } = useTheme();
-  const { hideNsfw, toggleNsfwFilter } = useNsfwFilter();
   const { history: subredditHistory, addToHistory, getSuggestions } = useSubredditHistory();
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -509,13 +507,8 @@ export default function Home() {
         });
     }
 
-    // Filter out NSFW posts if hideNsfw is enabled
-    if (hideNsfw) {
-      result = result.filter(p => !p.isNsfw);
-    }
-
     return result;
-  }, [posts, favorites, showFavoritesOnly, hideNsfw]);
+  }, [posts, favorites, showFavoritesOnly]);
 
   // Apply search filter
   const { searchQuery, setSearchQuery, filteredPosts: postsToDisplay, clearSearch, highlightMatch } = usePostSearch(basePosts);
@@ -1127,7 +1120,7 @@ export default function Home() {
                         )}
                       </div>
                     )}
-                    {/* Grid Density, Favorites and NSFW Filter Toggles */}
+                    {/* Grid Density and Favorites Toggles */}
                     <div className="flex flex-wrap justify-center gap-2 pt-2">
                         <Button
                             variant="outline"
@@ -1160,27 +1153,6 @@ export default function Home() {
                                 showFavoritesOnly && "fill-current"
                             )} />
                             {showFavoritesOnly ? "Showing" : "Show"} Favorites ({Object.keys(favorites).length})
-                        </Button>
-                        <Button
-                            variant={hideNsfw ? "outline" : "default"}
-                            size="sm"
-                            className={cn(
-                                "text-sm active:scale-95 transition-transform",
-                                !hideNsfw && "bg-orange-600 hover:bg-orange-700"
-                            )}
-                            onClick={toggleNsfwFilter}
-                        >
-                            {hideNsfw ? (
-                              <>
-                                <EyeOff className="h-4 w-4 mr-2" />
-                                NSFW Hidden
-                              </>
-                            ) : (
-                              <>
-                                <Eye className="h-4 w-4 mr-2" />
-                                NSFW Visible
-                              </>
-                            )}
                         </Button>
                     </div>
                 </CollapsibleContent>
