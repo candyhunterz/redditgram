@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { RedditPost, getPosts, SortType, TimeFrame } from "@/services/reddit";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Trash2, Save, X, Video, Copy as GalleryIcon, Filter, Loader2, ArrowUp, Heart, Sun, Moon, ArrowUpCircle, MessageCircle, Share2, Download, TrendingUp, HelpCircle, Keyboard, Search, Grid3X3, LayoutGrid, Grid2X2, Settings } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Video, Copy as GalleryIcon, Filter, Loader2, ArrowUp, Heart, Sun, Moon, ArrowUpCircle, MessageCircle, Share2, Download, TrendingUp, HelpCircle, Keyboard, Search, Grid3X3, LayoutGrid, Grid2X2, Settings } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { useSubredditHistory, POPULAR_SUBREDDITS } from "@/hooks/use-subreddit-history";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -37,8 +37,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  SelectGroup,
-  SelectLabel,
 } from "@/components/ui/select";
 import {
   Collapsible,
@@ -55,7 +53,9 @@ import {
   saveAllFavorites,
   getAllSavedLists,
   saveAllLists,
+  FeedPreset,
 } from '@/lib/indexed-db';
+import { FeedPresetBar } from '@/components/feed-preset-bar';
 import { usePrefetch } from '@/hooks/use-prefetch';
 // *** End Standard Imports ***
 
@@ -70,9 +70,6 @@ const parseSubreddits = (input: string): string[] => {
 };
 
 const POSTS_PER_LOAD = 20;
-const LOCAL_STORAGE_SAVED_LISTS_KEY = "savedSubredditLists";
-const LOCAL_STORAGE_FAVORITES_KEY = "favoritePosts";
-
 
 // --- Define Types ---
 type CachedRedditResponse = {
@@ -89,9 +86,6 @@ interface FavoritePostInfo {
     thumbnailUrl: string | undefined;
 }
 type FavoritesMap = { [postId: string]: FavoritePostInfo };
-
-// --- Define Saved Lists Type ---
-type SavedLists = { [name: string]: string };
 
 
 // --- MediaCarousel Component (Updated with Top Control Bar) ---
@@ -440,8 +434,8 @@ export default function Home() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [sortType, setSortType] = useState<SortType>('hot');
   const [timeFrame, setTimeFrame] = useState<TimeFrame>('day');
-  const [savedLists, setSavedLists] = useState<SavedLists>({});
-  const [selectedListName, setSelectedListName] = useState<string>("");
+  const [presets, setPresets] = useState<FeedPreset[]>([]);
+  const [activePresetName, setActivePresetName] = useState<string | null>(null);
   const [isControlsOpen, setIsControlsOpen] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
@@ -513,23 +507,23 @@ export default function Home() {
   // Apply search filter
   const { searchQuery, setSearchQuery, filteredPosts: postsToDisplay, clearSearch, highlightMatch } = usePostSearch(basePosts);
 
-  // --- Load/Save Saved Lists (IndexedDB) ---
+  // --- Load/Save Feed Presets (IndexedDB) ---
   useEffect(() => {
     const loadLists = async () => {
       try {
         // Clear old cache on mount
         await clearOldCache();
 
-        // Load saved lists from IndexedDB
-        const lists = await getAllSavedLists();
-        if (Object.keys(lists).length > 0) {
-          setSavedLists(lists);
+        // Load feed presets from IndexedDB
+        const loadedPresets = await getAllSavedLists();
+        if (loadedPresets.length > 0) {
+          setPresets(loadedPresets);
         }
 
         // Mark initial load as complete
         setInitialLoadComplete(true);
       } catch (err) {
-        console.error("Failed to load saved lists:", err);
+        console.error("Failed to load presets:", err);
         setInitialLoadComplete(true);
       }
     };
@@ -542,18 +536,18 @@ export default function Home() {
 
     const saveLists = async () => {
       try {
-        await saveAllLists(savedLists);
+        await saveAllLists(presets);
       } catch (err) {
-        console.error("Failed to save lists:", err);
+        console.error("Failed to save presets:", err);
         toast({
           variant: "destructive",
           title: "Save Error",
-          description: "Failed to save lists to storage."
+          description: "Failed to save presets to storage."
         });
       }
     };
     saveLists();
-  }, [savedLists, toast, initialLoadComplete]);
+  }, [presets, toast, initialLoadComplete]);
 
   // --- Load/Save Favorites (IndexedDB) ---
   useEffect(() => {
@@ -888,33 +882,65 @@ export default function Home() {
     }
   }, [toast]);
 
-  // --- Saved Lists Handlers ---
-   const handleSaveList = useCallback(() => {
-        const currentInput = subredditInput.trim(); if (!currentInput) { toast({ variant: "destructive", description: "Input field is empty." }); return; }
-        const listName = window.prompt("Enter a name for this list:", ""); if (listName === null) return;
-        const trimmedName = listName.trim(); if (!trimmedName) { toast({ variant: "destructive", description: "List name cannot be empty." }); return; }
-        if (trimmedName === "Load a saved list...") { toast({ variant: "destructive", description: `Invalid list name.` }); return; }
-        setSavedLists(prev => ({ ...prev, [trimmedName]: currentInput })); toast({ description: `List "${trimmedName}" saved.` }); setSelectedListName(trimmedName);
-   }, [subredditInput, toast]);
+  // --- Feed Preset Handlers ---
+   const handleSavePreset = useCallback(() => {
+        const currentInput = subredditInput.trim();
+        if (!currentInput) { toast({ variant: "destructive", description: "Input field is empty." }); return; }
+        const presetName = window.prompt("Enter a name for this preset:", "");
+        if (presetName === null) return;
+        const trimmedName = presetName.trim();
+        if (!trimmedName) { toast({ variant: "destructive", description: "Preset name cannot be empty." }); return; }
+        if (presets.some(p => p.name === trimmedName)) { toast({ variant: "destructive", description: `A preset named "${trimmedName}" already exists.` }); return; }
+        const newPreset: FeedPreset = {
+          name: trimmedName,
+          subreddits: currentInput,
+          sortType,
+          timeFrame,
+          order: Date.now(),
+          timestamp: Date.now(),
+        };
+        setPresets(prev => [...prev, newPreset]);
+        setActivePresetName(trimmedName);
+        toast({ description: `Preset "${trimmedName}" saved.` });
+   }, [subredditInput, sortType, timeFrame, presets, toast]);
 
-   const handleLoadList = useCallback((listName: string) => {
-        if (listName && savedLists[listName]) {
-          const listValue = savedLists[listName];
-          setSubredditInput(listValue);
-          setSelectedListName(listName);
-          // Pass the list value directly to avoid stale state issue
-          fetchInitialPosts(listValue);
-        }
-        else if (listName === "" || !savedLists[listName]) { setSelectedListName(""); }
-   }, [savedLists, fetchInitialPosts]);
+   const handleLoadPreset = useCallback((preset: FeedPreset) => {
+        setSubredditInput(preset.subreddits);
+        setSortType(preset.sortType as SortType);
+        setTimeFrame(preset.timeFrame as TimeFrame);
+        setActivePresetName(preset.name);
+        fetchInitialPosts(preset.subreddits);
+   }, [fetchInitialPosts]);
 
-   const handleDeleteList = useCallback(() => {
-        if (!selectedListName) { toast({ variant: "destructive", description: "No list selected to delete." }); return; }
-        if (window.confirm(`Delete list "${selectedListName}"?`)) {
-            setSavedLists(prev => { const newState = { ...prev }; delete newState[selectedListName]; return newState; });
-            setSelectedListName(""); toast({ description: `List "${selectedListName}" deleted.` });
+   const handleUpdatePreset = useCallback((presetName: string) => {
+        const currentInput = subredditInput.trim();
+        if (!currentInput) { toast({ variant: "destructive", description: "Input field is empty." }); return; }
+        setPresets(prev => prev.map(p =>
+          p.name === presetName
+            ? { ...p, subreddits: currentInput, sortType, timeFrame, timestamp: Date.now() }
+            : p
+        ));
+        toast({ description: `Preset "${presetName}" updated.` });
+   }, [subredditInput, sortType, timeFrame, toast]);
+
+   const handleDeletePreset = useCallback((presetName: string) => {
+        if (window.confirm(`Delete preset "${presetName}"?`)) {
+            setPresets(prev => prev.filter(p => p.name !== presetName));
+            if (activePresetName === presetName) setActivePresetName(null);
+            toast({ description: `Preset "${presetName}" deleted.` });
         }
-   }, [selectedListName, toast]);
+   }, [activePresetName, toast]);
+
+   const handleRenamePreset = useCallback((oldName: string) => {
+        const newName = window.prompt("Enter new name:", oldName);
+        if (newName === null) return;
+        const trimmed = newName.trim();
+        if (!trimmed) { toast({ variant: "destructive", description: "Name cannot be empty." }); return; }
+        if (trimmed !== oldName && presets.some(p => p.name === trimmed)) { toast({ variant: "destructive", description: `A preset named "${trimmed}" already exists.` }); return; }
+        setPresets(prev => prev.map(p => p.name === oldName ? { ...p, name: trimmed } : p));
+        if (activePresetName === oldName) setActivePresetName(trimmed);
+        toast({ description: `Preset renamed to "${trimmed}".` });
+   }, [presets, activePresetName, toast]);
 
    // --- Scroll to Top Function ---
    const scrollToTop = () => {
@@ -933,8 +959,6 @@ export default function Home() {
    }), [densityConfig]);
 
    // --- Render ---
-   const savedListNames = Object.keys(savedLists);
-
   return (
     <div className="container mx-auto px-2 py-4 sm:px-4 sm:py-6 min-h-screen flex flex-col">
       {/* Header */}
@@ -1058,6 +1082,19 @@ export default function Home() {
                  </Button>
                ))}
              </div>
+             {/* Feed Preset Bar - Always visible */}
+             <div className="flex justify-center">
+               <FeedPresetBar
+                 presets={presets}
+                 activePresetName={activePresetName}
+                 onLoadPreset={handleLoadPreset}
+                 onSavePreset={handleSavePreset}
+                 onUpdatePreset={handleUpdatePreset}
+                 onDeletePreset={handleDeletePreset}
+                 onRenamePreset={handleRenamePreset}
+                 disabled={isLoading}
+               />
+             </div>
              {/* Collapsible Controls */}
             <Collapsible open={isControlsOpen} onOpenChange={setIsControlsOpen}>
                  <div className="flex justify-center mb-2">
@@ -1068,18 +1105,6 @@ export default function Home() {
                      </CollapsibleTrigger>
                  </div>
                 <CollapsibleContent className="space-y-3 overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
-                    {/* Save/Load/Delete List Controls */}
-                    <div className="flex flex-col sm:flex-row items-stretch gap-2 pt-2">
-                        <Select value={selectedListName} onValueChange={handleLoadList} disabled={isLoading}>
-                            <SelectTrigger className="flex-grow" aria-label="Load saved list"><SelectValue placeholder="Load saved list..." /></SelectTrigger>
-                            <SelectContent><SelectGroup><SelectLabel>Saved Lists</SelectLabel>
-                                {savedListNames.length === 0 && <div className="px-2 py-1.5 text-sm text-muted-foreground">No lists saved</div>}
-                                {savedListNames.map(name => ( <SelectItem key={name} value={name}>{name}</SelectItem> ))}
-                            </SelectGroup></SelectContent>
-                        </Select>
-                        <Button onClick={handleSaveList} variant="outline" size="icon" aria-label="Save current list" title="Save current list" className="active:scale-95 transition-transform" disabled={isLoading || !subredditInput.trim()}><Save className="h-4 w-4" /></Button>
-                        <Button onClick={handleDeleteList} variant="destructive" size="icon" aria-label="Delete selected list" title="Delete selected list" disabled={!selectedListName || isLoading} className="active:scale-95 transition-transform"><Trash2 className="h-4 w-4" /></Button>
-                    </div>
                     {/* Sort/Timeframe Controls */}
                     <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-center justify-center pt-2">
                         <RadioGroup defaultValue="hot" className="flex gap-4" value={sortType} onValueChange={(value) => { if(!isLoading) setSortType(value as SortType)}} aria-label="Sort posts by" >

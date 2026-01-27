@@ -6,6 +6,16 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { RedditPost } from '@/services/reddit';
 
+// --- Feed Preset Type ---
+export interface FeedPreset {
+  name: string;
+  subreddits: string;
+  sortType: string;
+  timeFrame: string;
+  order: number;
+  timestamp: number;
+}
+
 // Database schema definition
 interface RedditCacheDB extends DBSchema {
   posts: {
@@ -40,6 +50,9 @@ interface RedditCacheDB extends DBSchema {
     value: {
       name: string;
       subreddits: string;
+      sortType: string;
+      timeFrame: string;
+      order: number;
       timestamp: number;
     };
     indexes: { 'by-timestamp': number };
@@ -47,7 +60,7 @@ interface RedditCacheDB extends DBSchema {
 }
 
 const DB_NAME = 'redditgram-cache';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const CACHE_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
 
 let dbPromise: Promise<IDBPDatabase<RedditCacheDB>> | null = null;
@@ -58,7 +71,7 @@ let dbPromise: Promise<IDBPDatabase<RedditCacheDB>> | null = null;
 async function getDB(): Promise<IDBPDatabase<RedditCacheDB>> {
   if (!dbPromise) {
     dbPromise = openDB<RedditCacheDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
+      upgrade(db, oldVersion, _newVersion, transaction) {
         // Create posts store
         if (!db.objectStoreNames.contains('posts')) {
           const postsStore = db.createObjectStore('posts', { keyPath: 'cacheKey' });
@@ -76,6 +89,27 @@ async function getDB(): Promise<IDBPDatabase<RedditCacheDB>> {
         if (!db.objectStoreNames.contains('savedLists')) {
           const listsStore = db.createObjectStore('savedLists', { keyPath: 'name' });
           listsStore.createIndex('by-timestamp', 'timestamp');
+        }
+
+        // Migrate v1 -> v2: add sortType, timeFrame, order to existing savedLists records
+        if (oldVersion < 2) {
+          const listsStore = transaction.objectStore('savedLists');
+          const migrateRecords = async () => {
+            let cursor = await listsStore.openCursor();
+            while (cursor) {
+              const value = cursor.value as any;
+              if (!value.sortType) {
+                await cursor.update({
+                  ...value,
+                  sortType: 'hot',
+                  timeFrame: 'day',
+                  order: value.timestamp || Date.now(),
+                });
+              }
+              cursor = await cursor.continue();
+            }
+          };
+          migrateRecords();
         }
       },
     });
@@ -235,32 +269,38 @@ export async function saveAllFavorites(favorites: Record<string, any>): Promise<
 }
 
 // ========================================================================
-// SAVED LISTS
+// SAVED LISTS (Feed Presets)
 // ========================================================================
 
 /**
- * Get all saved lists
+ * Get all feed presets (saved lists)
  */
-export async function getAllSavedLists(): Promise<Record<string, string>> {
+export async function getAllSavedLists(): Promise<FeedPreset[]> {
   try {
     const db = await getDB();
     const lists = await db.getAll('savedLists');
 
-    // Convert array to object with name as key
-    return lists.reduce((acc, list) => {
-      acc[list.name] = list.subreddits;
-      return acc;
-    }, {} as Record<string, string>);
+    // Return as FeedPreset array sorted by order
+    return lists
+      .map((list) => ({
+        name: list.name,
+        subreddits: list.subreddits,
+        sortType: list.sortType || 'hot',
+        timeFrame: list.timeFrame || 'day',
+        order: list.order ?? list.timestamp ?? Date.now(),
+        timestamp: list.timestamp,
+      }))
+      .sort((a, b) => a.order - b.order);
   } catch (error) {
     console.error('Error getting saved lists:', error);
-    return {};
+    return [];
   }
 }
 
 /**
- * Save all lists
+ * Save all feed presets
  */
-export async function saveAllLists(lists: Record<string, string>): Promise<void> {
+export async function saveAllLists(presets: FeedPreset[]): Promise<void> {
   try {
     const db = await getDB();
     const tx = db.transaction('savedLists', 'readwrite');
@@ -268,12 +308,15 @@ export async function saveAllLists(lists: Record<string, string>): Promise<void>
     // Clear existing lists
     await tx.store.clear();
 
-    // Add all lists
-    for (const [name, subreddits] of Object.entries(lists)) {
+    // Add all presets
+    for (const preset of presets) {
       await tx.store.put({
-        name,
-        subreddits,
-        timestamp: Date.now(),
+        name: preset.name,
+        subreddits: preset.subreddits,
+        sortType: preset.sortType,
+        timeFrame: preset.timeFrame,
+        order: preset.order,
+        timestamp: preset.timestamp,
       });
     }
 
