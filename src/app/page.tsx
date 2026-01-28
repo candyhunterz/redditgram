@@ -84,6 +84,8 @@ interface FavoritePostInfo {
     title: string;
     subreddit: string;
     thumbnailUrl: string | undefined;
+    mediaUrls?: string[];
+    fullQualityUrls?: string[];
 }
 type FavoritesMap = { [postId: string]: FavoritePostInfo };
 
@@ -486,16 +488,18 @@ export default function Home() {
     } else {
         // When showing only favorites, map the favorites map values
         result = Object.values(favorites).map((favInfo): RedditPost => {
-            const thumbnailUrl = favInfo.thumbnailUrl;
-            const urls = thumbnailUrl ? [thumbnailUrl] : [];
+            // Use stored arrays; fall back to thumbnailUrl for old favorites
+            const mediaUrls = favInfo.mediaUrls?.length ? favInfo.mediaUrls
+                : (favInfo.thumbnailUrl ? [favInfo.thumbnailUrl] : []);
+            const fullQualityUrls = favInfo.fullQualityUrls?.length ? favInfo.fullQualityUrls
+                : mediaUrls;
 
             return {
               postId: favInfo.postId,
               title: favInfo.title,
               subreddit: favInfo.subreddit,
-              mediaUrls: urls, // Use thumbnail
-              fullQualityUrls: urls, // Favorites only have thumbnails, use same for fullscreen
-              // *** FIX: Assume thumbnail is displayable, don't mark as unplayable video ***
+              mediaUrls,
+              fullQualityUrls,
               isUnplayableVideoFormat: false
             };
         });
@@ -597,7 +601,9 @@ export default function Home() {
           postId: post.postId,
           title: post.title,
           subreddit: post.subreddit,
-          thumbnailUrl: post.mediaUrls?.[0]
+          thumbnailUrl: post.mediaUrls?.[0],
+          mediaUrls: post.mediaUrls || [],
+          fullQualityUrls: post.fullQualityUrls || post.mediaUrls || [],
         };
         toast({ description: "Added to favorites" });
       } else {

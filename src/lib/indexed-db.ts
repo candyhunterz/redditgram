@@ -41,6 +41,8 @@ interface RedditCacheDB extends DBSchema {
       title: string;
       subreddit: string;
       thumbnailUrl?: string;
+      mediaUrls?: string[];
+      fullQualityUrls?: string[];
       timestamp: number;
     };
     indexes: { 'by-timestamp': number };
@@ -231,6 +233,8 @@ export async function getAllFavorites(): Promise<Record<string, any>> {
         title: fav.title,
         subreddit: fav.subreddit,
         thumbnailUrl: fav.thumbnailUrl,
+        mediaUrls: fav.mediaUrls,
+        fullQualityUrls: fav.fullQualityUrls,
       };
       return acc;
     }, {} as Record<string, any>);
@@ -258,6 +262,8 @@ export async function saveAllFavorites(favorites: Record<string, any>): Promise<
         title: favorite.title,
         subreddit: favorite.subreddit,
         thumbnailUrl: favorite.thumbnailUrl,
+        mediaUrls: favorite.mediaUrls,
+        fullQualityUrls: favorite.fullQualityUrls,
         timestamp: Date.now(),
       });
     }
