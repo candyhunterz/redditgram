@@ -28,12 +28,12 @@ Remove 26 dependencies and 1 devDependency from `package.json`: `@genkit-ai/goog
 - **Source**: PERFORMANCE_REFACTOR_PLAN §1.4
 - **Acceptance**: `npm install` succeeds, `npm run build` passes, bundle size reduced
 
-### REQ-CLEAN-04: Remove dead import from page.tsx
+### REQ-CLEAN-04: Remove dead import from page.tsx [COMPLETE - 01-02]
 Delete `import { useFocusTrap }` (imported but never called).
 - **Source**: PERFORMANCE_REFACTOR_PLAN §1.5
 - **Acceptance**: Import removed, build passes
 
-### REQ-CLEAN-05: Clean up console.logs
+### REQ-CLEAN-05: Clean up console.logs [COMPLETE - 01-02]
 Delete 6 colored cache-debug `console.log` calls in page.tsx. Delete 3 `[AUTH_LOG]` console.log calls in `src/app/api/reddit/route.ts`.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §1.6
 - **Acceptance**: No debug console.logs remain in production code
@@ -42,17 +42,17 @@ Delete 6 colored cache-debug `console.log` calls in page.tsx. Delete 3 `[AUTH_LO
 
 ## BUGFIX: Fix Known Bugs
 
-### REQ-BUGFIX-01: Fix missing Toaster mount
+### REQ-BUGFIX-01: Fix missing Toaster mount [COMPLETE - 01-02]
 In `src/app/layout.tsx`: remove `'use client'` directive and unused `Metadata` import. Add `<Toaster />` import and render.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §1.1
 - **Acceptance**: Toast notifications visible to user on favorite toggle, preset save, etc.
 
-### REQ-BUGFIX-02: Fix broken progressive image thumbnail
+### REQ-BUGFIX-02: Fix broken progressive image thumbnail [COMPLETE - 01-02]
 In `src/components/progressive-image.tsx`: fix URL manipulation to handle `preview.redd.it` URLs with query params. Only apply `m` suffix for `i.redd.it`; for `preview.redd.it` reduce `width` query param; otherwise fallback to original src.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §1.8
 - **Acceptance**: Blur placeholders load correctly for all Reddit image hosts
 
-### REQ-BUGFIX-03: Fix confusing error toast message
+### REQ-BUGFIX-03: Fix confusing error toast message [COMPLETE - 01-02]
 Change "Check console." toast to "Some subreddits could not be loaded."
 - **Source**: PERFORMANCE_REFACTOR_PLAN §1.6
 - **Acceptance**: User-facing error messages are actionable
@@ -81,7 +81,7 @@ In `src/lib/indexed-db.ts`: add `putFavorite(postId, data)`, `deleteFavorite(pos
 - **Source**: PERFORMANCE_REFACTOR_PLAN §3.2
 - **Acceptance**: Favorite toggle is O(1) instead of O(n), preset operations are granular
 
-### REQ-PERF-03: Add Cache-Control header to API response
+### REQ-PERF-03: Add Cache-Control header to API response [COMPLETE - 01-02]
 In `src/app/api/reddit/route.ts`: add `Cache-Control: public, s-maxage=60, stale-while-revalidate=300` to success response.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §1.7
 - **Acceptance**: Response includes Cache-Control header, verified in network tab

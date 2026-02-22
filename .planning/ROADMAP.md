@@ -33,8 +33,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 2 plans
 
 Plans:
-- [ ] 01-01-PLAN.md -- Delete unused files (21 UI components, 2 AI files) and remove 27 unused npm packages
-- [ ] 01-02-PLAN.md -- Fix bugs (Toaster, thumbnails, error messages), add cache headers, clean dead code
+- [x] 01-01-PLAN.md -- Delete unused files (21 UI components, 2 AI files) and remove 27 unused npm packages
+- [x] 01-02-PLAN.md -- Fix bugs (Toaster, thumbnails, error messages), add cache headers, clean dead code
 
 **Risk/Dependencies**: Low -- purely additive/subtractive changes. No logic restructuring. Each deletion is independently verifiable via build.
 
