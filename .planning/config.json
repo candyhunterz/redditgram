@@ -1,0 +1,9 @@
+{
+  "mode": "quick",
+  "git": "phase-commits",
+  "parallel": true,
+  "model_profile": "balanced",
+  "research": "skip",
+  "plan_check": false,
+  "verifier": false
+}
