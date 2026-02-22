@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 ## Current Position
 
 Phase: 3 of 5 (Extract Custom Hooks)
-Plan: 3 of 4 in current phase
-Status: In progress
-Last activity: 2026-02-22 -- Completed Plan 03-03 (extract useRedditPosts + rewire page.tsx)
+Plan: 4 of 4 in current phase (COMPLETE)
+Status: Phase complete
+Last activity: 2026-02-22 -- Completed Plan 03-04 (write tests for use-favorites, use-feed-presets, use-reddit-posts)
 
-Progress: [=======...] 62%
+Progress: [========..] 68%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
-- Average duration: 2.4 min
-- Total execution time: 0.28 hours
+- Total plans completed: 8
+- Average duration: 2.3 min
+- Total execution time: 0.30 hours
 
 **By Phase:**
 
@@ -29,10 +29,10 @@ Progress: [=======...] 62%
 |-------|-------|-------|----------|
 | 01-quick-wins | 2/2 | 10 min | 5 min |
 | 02-performance-bug-fixes | 2/3 | 3 min | 1.5 min |
-| 03-extract-custom-hooks | 3/4 | 7 min | 2.3 min |
+| 03-extract-custom-hooks | 4/4 | 9 min | 2.25 min |
 
 **Recent Trend:**
-- Last 5 plans: 1 min, 2 min, 2 min, 1 min, 4 min
+- Last 5 plans: 2 min, 2 min, 1 min, 4 min, 2 min
 - Trend: -
 
 *Updated after each plan completion*
@@ -43,6 +43,7 @@ Progress: [=======...] 62%
 | Phase 03-extract-custom-hooks P01 | 2 | 2 tasks | 3 files |
 | Phase 03-extract-custom-hooks P02 | 1 | 2 tasks | 4 files |
 | Phase 03-extract-custom-hooks P03 | 4 | 2 tasks | 2 files |
+| Phase 03-extract-custom-hooks P04 | 2 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,7 @@ Recent decisions affecting current work:
 - Plan 03-03: fetchInitialPosts does not reset showFavoritesOnly/showSuggestions — page.tsx triggerFetch wrapper owns those resets so hook stays pure
 - Plan 03-03: addToHistory passed as option argument (not closure) — hook does not close over page-level state
 - Plan 03-03: basePosts useMemo stays in page.tsx — orchestrates posts+favorites across two hooks, not extractable without coupling them
+- [Phase 03-04]: IntersectionObserver mocked at global scope in test file (not jest.setup.ts) — keeps the mock scoped to the test that needs it
 
 ### Pending Todos
 
@@ -85,5 +87,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 03-03-PLAN.md (extract useRedditPosts + rewire page.tsx)
+Stopped at: Completed 03-04-PLAN.md (write tests for use-favorites, use-feed-presets, use-reddit-posts — Phase 3 complete)
 Resume file: None
