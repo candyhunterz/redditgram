@@ -468,6 +468,9 @@ export default function Home() {
     }
   }, [settings.gridDensity, density, setDensity]);
 
+  // --- Refs ---
+  const showScrollTopRef = useRef(false);
+
   // --- Cache ---
   const apiCache = useRef(new Map<CacheKey, CachedRedditResponse>()).current;
   const generateCacheKey = ( sub: string, sort: SortType, time?: TimeFrame, after?: string | null ): CacheKey => {
@@ -481,9 +484,9 @@ export default function Home() {
     let result: RedditPost[];
 
     if (!showFavoritesOnly) {
-        // When showing all posts, return the fetched posts array directly
-        // Ensure the isUnplayable flag from fetch is preserved
-        result = posts.map(p => ({...p, isUnplayableVideoFormat: p.isUnplayableVideoFormat ?? false}));
+        // When showing all posts, return the fetched posts array directly.
+        // isUnplayableVideoFormat is already set by the API route on every post object.
+        result = posts;
     } else {
         // When showing only favorites, map the favorites map values
         result = Object.values(favorites).map((favInfo): RedditPost => {
@@ -819,16 +822,18 @@ export default function Home() {
    // --- Scroll Listener Effect for Scroll-to-Top Button ---
   useEffect(() => {
     const checkScrollTop = () => {
-      if (!showScrollTop && window.scrollY > 400) {
+      if (!showScrollTopRef.current && window.scrollY > 400) {
+        showScrollTopRef.current = true;
         setShowScrollTop(true);
-      } else if (showScrollTop && window.scrollY <= 400) {
+      } else if (showScrollTopRef.current && window.scrollY <= 400) {
+        showScrollTopRef.current = false;
         setShowScrollTop(false);
       }
     };
 
-    window.addEventListener('scroll', checkScrollTop);
+    window.addEventListener('scroll', checkScrollTop, { passive: true });
     return () => window.removeEventListener('scroll', checkScrollTop);
-  }, [showScrollTop]);
+  }, []);
 
 
   // --- Event Handlers ---
