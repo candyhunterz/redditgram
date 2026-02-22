@@ -1,11 +1,10 @@
 // src/app/page.tsx
 "use client";
 
-import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 // *** Standard Imports ***
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { RedditPost, getPosts, SortType, TimeFrame } from "@/services/reddit";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, X, Video, Copy as GalleryIcon, Filter, Loader2, ArrowUp, Heart, Sun, Moon, ArrowUpCircle, MessageCircle, Share2, Download, TrendingUp, HelpCircle, Keyboard, Search, Grid3X3, LayoutGrid, Grid2X2, Settings } from "lucide-react";
@@ -19,7 +18,6 @@ import { usePostSearch } from "@/hooks/use-post-search";
 import { useGridDensity, DENSITY_CONFIG } from "@/hooks/use-grid-density";
 import { useSettings } from "@/hooks/use-settings";
 import { SettingsModal } from "@/components/settings-modal";
-import { LRUCache } from "@/lib/lru-cache";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -27,7 +25,7 @@ import {
   DialogContent,
   DialogTitle,
   DialogDescription,
-  DialogClose // Keep DialogClose import as it's used within MediaCarousel now
+  DialogClose
 } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -45,49 +43,17 @@ import {
 } from "@/components/ui/collapsible";
 import Masonry from 'react-masonry-css';
 import { ProgressiveImage, ProgressiveVideo } from '@/components/progressive-image';
-import {
-  getCachedPosts,
-  setCachedPosts,
-  clearOldCache,
-  getAllFavorites,
-  saveAllFavorites,
-  getAllSavedLists,
-  saveAllLists,
-  FeedPreset,
-} from '@/lib/indexed-db';
+import { FeedPreset } from '@/lib/indexed-db';
 import { FeedPresetBar } from '@/components/feed-preset-bar';
-import { usePrefetch } from '@/hooks/use-prefetch';
+// *** Custom Hooks ***
+import { useScrollToTop } from '@/hooks/use-scroll-to-top';
+import { useFullscreenDialog } from '@/hooks/use-fullscreen-dialog';
+import { useFavorites } from '@/hooks/use-favorites';
+import { useFeedPresets } from '@/hooks/use-feed-presets';
+import { useRedditPosts } from '@/hooks/use-reddit-posts';
+// *** Shared Types ***
+import type { RedditPost, SortType, TimeFrame } from '@/types/reddit';
 // *** End Standard Imports ***
-
-
-// --- Helper Functions & Constants ---
-const isValidSubreddit = (subreddit: string): boolean => {
-  return /^[a-zA-Z0-9_]+$/.test(subreddit) && subreddit.length > 0;
-};
-
-const parseSubreddits = (input: string): string[] => {
-  return input.split(',').map(s => s.trim()).filter(s => s !== '');
-};
-
-const POSTS_PER_LOAD = 20;
-
-// --- Define Types ---
-type CachedRedditResponse = {
-    posts: RedditPost[];
-    after: string | null;
-};
-type CacheKey = string;
-
-// --- Define Favorites Types ---
-interface FavoritePostInfo {
-    postId: string;
-    title: string;
-    subreddit: string;
-    thumbnailUrl: string | undefined;
-    mediaUrls?: string[];
-    fullQualityUrls?: string[];
-}
-type FavoritesMap = { [postId: string]: FavoritePostInfo };
 
 
 // --- MediaCarousel Component (Updated with Top Control Bar) ---
@@ -113,11 +79,11 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
     // --- State and Refs ---
     const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
     const isMobile = useIsMobile();
-    const containerRef = useRef<HTMLDivElement>(null);
-    const touchStartX = useRef<number | null>(null);
-    const touchEndX = useRef<number | null>(null);
-    const touchStartY = useRef<number | null>(null);
-    const touchEndY = useRef<number | null>(null);
+    const containerRef = React.useRef<HTMLDivElement>(null);
+    const touchStartX = React.useRef<number | null>(null);
+    const touchEndX = React.useRef<number | null>(null);
+    const touchStartY = React.useRef<number | null>(null);
+    const touchEndY = React.useRef<number | null>(null);
     const swipeThreshold = 50;
 
     // --- Derived State & Callbacks ---
@@ -405,51 +371,21 @@ const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
 MediaCarousel.displayName = 'MediaCarousel';
 
 
-// --- Interleaving Helper ---
-const interleavePosts = (groupedPosts: RedditPost[][]): RedditPost[] => {
-    if (!groupedPosts || groupedPosts.length === 0) return [];
-    const interleaved: RedditPost[] = [];
-    const groupCount = groupedPosts.length;
-    const maxLength = Math.max(...groupedPosts.map(group => group.length));
-    for (let j = 0; j < maxLength; j++) {
-        for (let i = 0; i < groupCount; i++) {
-            if (j < groupedPosts[i].length) interleaved.push(groupedPosts[i][j]);
-        }
-    }
-    return interleaved;
-};
-
-
 // --- Home Page Component ---
 export default function Home() {
-  // --- State Variables ---
+  // --- UI State (stays in page.tsx) ---
   const [subredditInput, setSubredditInput] = useState<string>('');
-  const [posts, setPosts] = useState<RedditPost[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedPost, setSelectedPost] = useState<RedditPost | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [afterTokens, setAfterTokens] = useState<{ [subreddit: string]: string | null }>({});
-  const [hasMore, setHasMore] = useState(true);
-  const [fetchInitiated, setFetchInitiated] = useState(false);
-  const [favorites, setFavorites] = useState<FavoritesMap>({});
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [sortType, setSortType] = useState<SortType>('hot');
   const [timeFrame, setTimeFrame] = useState<TimeFrame>('day');
-  const [presets, setPresets] = useState<FeedPreset[]>([]);
-  const [activePresetName, setActivePresetName] = useState<string | null>(null);
   const [isControlsOpen, setIsControlsOpen] = useState(false);
-  const [showScrollTop, setShowScrollTop] = useState(false);
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
-  const [favoritesLoadComplete, setFavoritesLoadComplete] = useState(false);
-
-  const { toast } = useToast();
-  const { theme, toggleTheme } = useTheme();
-  const { history: subredditHistory, addToHistory, getSuggestions } = useSubredditHistory();
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+
+  const { toast } = useToast();
+  const { theme, toggleTheme } = useTheme();
+  const { history: subredditHistory, addToHistory, getSuggestions } = useSubredditHistory();
 
   // Centralized settings
   const {
@@ -459,7 +395,7 @@ export default function Home() {
     resolvedTheme,
   } = useSettings();
 
-  // Phase 3 hooks
+  // Grid density hook
   const { density, setDensity, cycleDensity, config: densityConfig, gridStyle } = useGridDensity();
 
   // Sync settings.gridDensity with useGridDensity hook
@@ -469,18 +405,43 @@ export default function Home() {
     }
   }, [settings.gridDensity, density, setDensity]);
 
-  // --- Refs ---
-  const showScrollTopRef = useRef(false);
+  // -----------------------------------------------------------------------
+  // Custom Hooks (Phase 3 extractions)
+  // -----------------------------------------------------------------------
+  const { showScrollTop, scrollToTop } = useScrollToTop();
+  const { selectedPost, isDialogOpen, openDialog, closeDialog } = useFullscreenDialog();
+  const { favorites, showFavoritesOnly, setShowFavoritesOnly, favoritesLoadComplete, toggleFavorite } = useFavorites();
+  const {
+    presets,
+    activePresetName,
+    setActivePresetName,
+    initialLoadComplete,
+    handleSavePreset,
+    handleLoadPreset,
+    handleUpdatePreset,
+    handleDeletePreset,
+    handleRenamePreset,
+  } = useFeedPresets();
+  const {
+    posts,
+    error,
+    isLoading,
+    hasMore,
+    fetchInitiated,
+    fetchInitialPosts,
+    loadMorePosts,
+    lastPostRef,
+  } = useRedditPosts({
+    subredditInput,
+    sortType,
+    timeFrame,
+    showFavoritesOnly,
+    addToHistory,
+  });
 
-  // --- Cache ---
-  const apiCache = useRef(new LRUCache<CacheKey, CachedRedditResponse>(100)).current;
-  const generateCacheKey = ( sub: string, sort: SortType, time?: TimeFrame, after?: string | null ): CacheKey => {
-      const timeKey = sort === 'top' ? (time || 'all') : 'hot';
-      const afterKey = after || 'initial';
-      return `${sub}::${sort}::${timeKey}::${afterKey}`;
-  };
-
-  // --- Filtered Posts with Search ---
+  // -----------------------------------------------------------------------
+  // basePosts — page-level orchestration: merge posts + favorites views
+  // -----------------------------------------------------------------------
   const basePosts = useMemo(() => {
     let result: RedditPost[];
 
@@ -503,7 +464,7 @@ export default function Home() {
               subreddit: favInfo.subreddit,
               mediaUrls,
               fullQualityUrls,
-              isUnplayableVideoFormat: false
+              isUnplayableVideoFormat: false,
             };
         });
     }
@@ -514,341 +475,30 @@ export default function Home() {
   // Apply search filter
   const { searchQuery, setSearchQuery, filteredPosts: postsToDisplay, clearSearch, highlightMatch } = usePostSearch(basePosts);
 
-  // --- Load/Save Feed Presets (IndexedDB) ---
-  useEffect(() => {
-    const loadLists = async () => {
-      try {
-        // Clear old cache on mount
-        await clearOldCache();
+  // -----------------------------------------------------------------------
+  // Preset wiring — thin wrapper to orchestrate hook + page-level state
+  // -----------------------------------------------------------------------
+  const onLoadPreset = useCallback((preset: FeedPreset) => {
+    handleLoadPreset(preset);
+    setSubredditInput(preset.subreddits);
+    setSortType(preset.sortType as SortType);
+    setTimeFrame(preset.timeFrame as TimeFrame);
+    setShowFavoritesOnly(false);
+    setShowSuggestions(false);
+    fetchInitialPosts(preset.subreddits);
+  }, [handleLoadPreset, fetchInitialPosts, setShowFavoritesOnly]);
 
-        // Load feed presets from IndexedDB
-        const loadedPresets = await getAllSavedLists();
-        if (loadedPresets.length > 0) {
-          setPresets(loadedPresets);
-        }
+  const onSavePreset = useCallback(() => {
+    handleSavePreset(subredditInput, sortType, timeFrame);
+  }, [handleSavePreset, subredditInput, sortType, timeFrame]);
 
-        // Mark initial load as complete
-        setInitialLoadComplete(true);
-      } catch (err) {
-        console.error("Failed to load presets:", err);
-        setInitialLoadComplete(true);
-      }
-    };
-    loadLists();
-  }, []);
+  const onUpdatePreset = useCallback((presetName: string) => {
+    handleUpdatePreset(presetName, subredditInput, sortType, timeFrame);
+  }, [handleUpdatePreset, subredditInput, sortType, timeFrame]);
 
-  useEffect(() => {
-    // Don't save until initial load is complete
-    if (!initialLoadComplete) return;
-
-    const saveLists = async () => {
-      try {
-        await saveAllLists(presets);
-      } catch (err) {
-        console.error("Failed to save presets:", err);
-        toast({
-          variant: "destructive",
-          title: "Save Error",
-          description: "Failed to save presets to storage."
-        });
-      }
-    };
-    saveLists();
-  }, [presets, toast, initialLoadComplete]);
-
-  // --- Load/Save Favorites (IndexedDB) ---
-  useEffect(() => {
-    const loadFavorites = async () => {
-      try {
-        const favs = await getAllFavorites();
-        if (Object.keys(favs).length > 0) {
-          setFavorites(favs);
-        }
-
-        // Mark favorites load as complete
-        setFavoritesLoadComplete(true);
-      } catch (err) {
-        console.error("Failed to load favorites:", err);
-        setFavoritesLoadComplete(true);
-      }
-    };
-    loadFavorites();
-  }, []);
-
-  useEffect(() => {
-    // Don't save until initial load is complete
-    if (!favoritesLoadComplete) return;
-
-    const saveFavorites = async () => {
-      try {
-        await saveAllFavorites(favorites);
-      } catch (err) {
-        console.error("Failed to save favorites:", err);
-        toast({
-          variant: "destructive",
-          title: "Save Error",
-          description: "Failed to save favorites to storage."
-        });
-      }
-    };
-    saveFavorites();
-  }, [favorites, toast, favoritesLoadComplete]);
-
-  // --- Favorites Handlers ---
-  const toggleFavorite = useCallback((post: RedditPost) => {
-    setFavorites(currentFavorites => {
-      const newFavorites = { ...currentFavorites };
-      if (!currentFavorites[post.postId]) {
-        // Add to favorites
-        newFavorites[post.postId] = {
-          postId: post.postId,
-          title: post.title,
-          subreddit: post.subreddit,
-          thumbnailUrl: post.mediaUrls?.[0],
-          mediaUrls: post.mediaUrls || [],
-          fullQualityUrls: post.fullQualityUrls || post.mediaUrls || [],
-        };
-        toast({ description: "Added to favorites" });
-      } else {
-        // Remove from favorites
-        delete newFavorites[post.postId];
-        toast({ description: "Removed from favorites" });
-      }
-      return newFavorites;
-    });
-  }, [toast]);
-
-  // --- Infinite Scroll ---
-  const observer = useRef<IntersectionObserver>();
-  const loadMorePostsRef = useRef<() => Promise<void>>();
-  const lastPostRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (isLoading || showFavoritesOnly) return; // Don't observe when showing favorites
-      if (observer.current) observer.current.disconnect();
-      observer.current = new IntersectionObserver(entries => {
-        if (entries[0]?.isIntersecting && hasMore && fetchInitiated) { loadMorePostsRef.current?.(); }
-      }, { threshold: 0.5 });
-      if (node) observer.current.observe(node);
-    }, [isLoading, hasMore, fetchInitiated, showFavoritesOnly]);
-
-   // --- Data Fetching (with Caching) ---
-   const performFetch = useCallback(async (
-      subredditsToFetch: string[],
-      currentSortType: SortType,
-      currentTimeFrame: TimeFrame | undefined,
-      currentAfterTokens: { [subreddit: string]: string | null }
-   ): Promise<{
-        groupedPosts: RedditPost[][];
-        updatedAfterTokens: { [subreddit: string]: string | null };
-        anyHasMore: boolean;
-    }> => {
-
-    if (subredditsToFetch.length === 0) return { groupedPosts: [], updatedAfterTokens: {}, anyHasMore: false };
-    if (!subredditsToFetch.every(isValidSubreddit)) throw new Error("Invalid subreddit name found.");
-
-    type SuccessfulFetchValue = { posts: RedditPost[]; after: string | null; sub: string; };
-    let overallError: Error | null = null;
-    const fetchPromises: Promise<SuccessfulFetchValue>[] = [];
-    const subOrderForResults: string[] = [];
-
-    for (const sub of subredditsToFetch) {
-        const afterParam = currentAfterTokens[sub] ?? undefined;
-        const cacheKey = generateCacheKey(sub, currentSortType, currentSortType === 'top' ? currentTimeFrame : undefined, afterParam);
-        subOrderForResults.push(sub);
-
-        // Check in-memory cache first (fastest)
-        if (apiCache.has(cacheKey)) {
-            const cachedData = apiCache.get(cacheKey)!;
-            const postsWithMetadata = cachedData.posts.map(p => ({
-                ...p,
-                subreddit: sub,
-                isUnplayableVideoFormat: p.isUnplayableVideoFormat ?? false
-            }));
-            fetchPromises.push(Promise.resolve({
-                posts: postsWithMetadata,
-                after: cachedData.after,
-                sub: sub
-            }));
-        } else {
-            // Check IndexedDB cache (persistent)
-            fetchPromises.push(
-                (async () => {
-                    const idbCached = await getCachedPosts(cacheKey);
-                    if (idbCached) {
-                        // Store in memory cache for faster subsequent access
-                        apiCache.set(cacheKey, { posts: idbCached.posts, after: idbCached.after });
-                        const postsWithMetadata = idbCached.posts.map(p => ({
-                            ...p,
-                            subreddit: sub,
-                            isUnplayableVideoFormat: p.isUnplayableVideoFormat ?? false
-                        }));
-                        return { posts: postsWithMetadata, after: idbCached.after, sub: sub };
-                    }
-
-                    // Cache miss - fetch from API
-                    const response = await getPosts(sub, currentSortType, {
-                        timeFrame: currentSortType === 'top' ? currentTimeFrame : undefined,
-                        after: afterParam,
-                        limit: POSTS_PER_LOAD
-                    });
-
-                    // Store in both caches
-                    const dataToCache: CachedRedditResponse = { posts: response.posts, after: response.after };
-                    apiCache.set(cacheKey, dataToCache);
-                    await setCachedPosts(cacheKey, response.posts, response.after, {
-                        subreddit: sub,
-                        sortType: currentSortType,
-                        timeFrame: currentSortType === 'top' ? currentTimeFrame : undefined,
-                    });
-
-                    const postsWithMetadata = response.posts.map(p => ({
-                        ...p,
-                        subreddit: sub,
-                        isUnplayableVideoFormat: p.isUnplayableVideoFormat ?? false
-                    }));
-                    return { posts: postsWithMetadata, after: response.after, sub: sub };
-                })()
-            );
-        }
-    }
-
-    try {
-        const results: PromiseSettledResult<SuccessfulFetchValue>[] = await Promise.allSettled(fetchPromises);
-        const successfulResults: SuccessfulFetchValue[] = [];
-        const errors: { sub: string, reason: unknown }[] = [];
-        const updatedAfterTokens: { [subreddit: string]: string | null } = {};
-
-        results.forEach((result, index) => {
-            const sub = subOrderForResults[index];
-            if (result.status === 'fulfilled') {
-                successfulResults.push(result.value);
-                updatedAfterTokens[sub] = result.value.after;
-            } else {
-                console.error(`Failed to fetch/process for r/${sub}:`, result.reason);
-                errors.push({ sub: sub, reason: result.reason });
-                updatedAfterTokens[sub] = currentAfterTokens[sub] ?? null;
-                if (!overallError) { overallError = result.reason instanceof Error ? result.reason : new Error(`Fetch failed for r/${sub}: ${String(result.reason)}`); }
-            }
-        });
-
-       if (overallError && successfulResults.length === 0) throw new Error(`All subreddit fetches failed. First error: ${overallError}`);
-       else if (overallError) toast({ variant: "destructive", title: "Fetch Warning", description: "Some subreddits could not be loaded." });
-
-      const groupedPosts = successfulResults.map(res => res.posts);
-      const anyHasMore = Object.values(updatedAfterTokens).some(token => token !== null);
-      const finalUpdatedTokens = {...currentAfterTokens, ...updatedAfterTokens};
-
-      return { groupedPosts, updatedAfterTokens: finalUpdatedTokens, anyHasMore };
-
-    } catch (e) { if (e instanceof Error) { throw e; } else { throw new Error('An unexpected error occurred during the fetch process.'); } }
-   }, [apiCache, toast, generateCacheKey]);
-
-   const fetchInitialPosts = useCallback(async (inputOverride?: string) => {
-     setShowFavoritesOnly(false); // Reset favorites filter when fetching new posts
-     setShowSuggestions(false); // Hide suggestions when fetching
-     const inputToUse = inputOverride ?? subredditInput;
-     let subsToUse = parseSubreddits(inputToUse);
-
-     // Save searched subreddits to history
-     subsToUse.forEach(sub => {
-       if (isValidSubreddit(sub)) {
-         addToHistory(sub);
-       }
-     });
-     if (subsToUse.length === 0) {
-        setError("Please enter at least one valid subreddit name.");
-        setPosts([]); setFetchInitiated(false); setHasMore(false); return;
-     }
-
-     subsToUse.forEach(sub => {
-         const initialCacheKey = generateCacheKey(sub, sortType, sortType === 'top' ? timeFrame : undefined, undefined);
-         if (apiCache.has(initialCacheKey)) {
-             apiCache.delete(initialCacheKey);
-         }
-     });
-
-     setIsLoading(true); setError(null); setPosts([]); setAfterTokens({}); setHasMore(true); setFetchInitiated(true);
-     try {
-         const { groupedPosts, updatedAfterTokens, anyHasMore } = await performFetch( subsToUse, sortType, timeFrame, {} );
-         const interleavedInitialPosts = interleavePosts(groupedPosts);
-         setPosts(interleavedInitialPosts); setAfterTokens(updatedAfterTokens); setHasMore(anyHasMore);
-          if (interleavedInitialPosts.length === 0 && anyHasMore === false && !error) {
-               if (subsToUse.every(isValidSubreddit)) {
-                  toast({ description: `No posts found for "${subsToUse.join(', ')}" with the current filters.` });
-               } else { toast({ description: "No posts found." }); }
-          }
-     } catch (e) {
-         if (e instanceof Error) { setError(`Fetch error: ${e.message}`); }
-         else { setError('An unknown error occurred during the initial fetch.'); }
-         setHasMore(false); setPosts([]);
-     } finally { setIsLoading(false); }
-   }, [subredditInput, sortType, timeFrame, toast, performFetch, apiCache, generateCacheKey]);
-
-   const loadMorePosts = useCallback(async () => {
-     if (isLoading || !hasMore || !fetchInitiated) return;
-     let subsToUse = parseSubreddits(subredditInput);
-     if (subsToUse.length === 0) { setHasMore(false); return; }
-     const subsWithPotentialMore = subsToUse.filter(sub => afterTokens[sub] !== null && afterTokens[sub] !== undefined);
-     if (subsWithPotentialMore.length === 0) { setHasMore(false); return; }
-
-     setIsLoading(true); setError(null);
-     try {
-          const { groupedPosts, updatedAfterTokens, anyHasMore } = await performFetch( subsWithPotentialMore, sortType, timeFrame, afterTokens );
-         const interleavedNewPosts = interleavePosts(groupedPosts);
-         setPosts(prevPosts => [...prevPosts, ...interleavedNewPosts]);
-         setAfterTokens(updatedAfterTokens); setHasMore(anyHasMore);
-     } catch (e) {
-         if (e instanceof Error) { setError(`Load more error: ${e.message}`); }
-         else { setError('An unknown error occurred while loading more posts.'); }
-         setHasMore(false);
-     } finally { setIsLoading(false); }
-   }, [isLoading, hasMore, fetchInitiated, afterTokens, subredditInput, sortType, timeFrame, toast, performFetch, apiCache]);
-
-   useEffect(() => { loadMorePostsRef.current = loadMorePosts; }, [loadMorePosts]);
-
-   // --- Prefetch next page at 80% scroll ---
-   const { resetPrefetch } = usePrefetch({
-     onPrefetch: loadMorePosts,
-     enabled: !isLoading && hasMore && fetchInitiated && !showFavoritesOnly,
-     threshold: 80,
-   });
-
-   // Reset prefetch trigger when new posts are loaded
-   useEffect(() => {
-     if (!isLoading && posts.length > 0) {
-       resetPrefetch();
-     }
-   }, [posts.length, isLoading, resetPrefetch]);
-
-   // --- Scroll Listener Effect for Scroll-to-Top Button ---
-  useEffect(() => {
-    const checkScrollTop = () => {
-      if (!showScrollTopRef.current && window.scrollY > 400) {
-        showScrollTopRef.current = true;
-        setShowScrollTop(true);
-      } else if (showScrollTopRef.current && window.scrollY <= 400) {
-        showScrollTopRef.current = false;
-        setShowScrollTop(false);
-      }
-    };
-
-    window.addEventListener('scroll', checkScrollTop, { passive: true });
-    return () => window.removeEventListener('scroll', checkScrollTop);
-  }, []);
-
-
-  // --- Event Handlers ---
-  const handleThumbnailClick = useCallback((post: RedditPost) => {
-    setSelectedPost(post);
-    setIsDialogOpen(true);
-  }, []);
-
-  const handleDialogClose = useCallback(() => {
-    setIsDialogOpen(false);
-    setTimeout(() => { setSelectedPost(null); }, 300);
-  }, []);
-
-  // --- Share Handler ---
+  // -----------------------------------------------------------------------
+  // Share / Download handlers (stay in page.tsx — UI actions)
+  // -----------------------------------------------------------------------
   const handleShare = useCallback(async (post: RedditPost) => {
     const result = await sharePost({
       title: post.title,
@@ -857,22 +507,21 @@ export default function Home() {
     });
     if (result.shared) {
       if (result.method === 'clipboard') {
-        toast({ description: "Link copied to clipboard" });
+        toast({ description: 'Link copied to clipboard' });
       }
     } else {
-      toast({ variant: "destructive", description: "Failed to share" });
+      toast({ variant: 'destructive', description: 'Failed to share' });
     }
   }, [toast]);
 
-  // --- Download Handler ---
   const handleDownload = useCallback(async (post: RedditPost) => {
     const urlToDownload = post.fullQualityUrls?.[0] || post.mediaUrls?.[0];
     if (!urlToDownload) {
-      toast({ variant: "destructive", description: "No media to download" });
+      toast({ variant: 'destructive', description: 'No media to download' });
       return;
     }
 
-    toast({ description: "Starting download..." });
+    toast({ description: 'Starting download...' });
 
     const success = await downloadMedia({
       url: urlToDownload,
@@ -881,89 +530,30 @@ export default function Home() {
     });
 
     if (success) {
-      toast({ description: "Download complete" });
+      toast({ description: 'Download complete' });
     } else {
-      toast({ variant: "destructive", description: "Download failed" });
+      toast({ variant: 'destructive', description: 'Download failed' });
     }
   }, [toast]);
 
-  // --- Feed Preset Handlers ---
-   const handleSavePreset = useCallback(() => {
-        const currentInput = subredditInput.trim();
-        if (!currentInput) { toast({ variant: "destructive", description: "Input field is empty." }); return; }
-        const presetName = window.prompt("Enter a name for this preset:", "");
-        if (presetName === null) return;
-        const trimmedName = presetName.trim();
-        if (!trimmedName) { toast({ variant: "destructive", description: "Preset name cannot be empty." }); return; }
-        if (presets.some(p => p.name === trimmedName)) { toast({ variant: "destructive", description: `A preset named "${trimmedName}" already exists.` }); return; }
-        const newPreset: FeedPreset = {
-          name: trimmedName,
-          subreddits: currentInput,
-          sortType,
-          timeFrame,
-          order: Date.now(),
-          timestamp: Date.now(),
-        };
-        setPresets(prev => [...prev, newPreset]);
-        setActivePresetName(trimmedName);
-        toast({ description: `Preset "${trimmedName}" saved.` });
-   }, [subredditInput, sortType, timeFrame, presets, toast]);
+  // -----------------------------------------------------------------------
+  // Fetch trigger — reset UI state then delegate to hook
+  // -----------------------------------------------------------------------
+  const triggerFetch = useCallback((inputOverride?: string) => {
+    setShowFavoritesOnly(false);
+    setShowSuggestions(false);
+    fetchInitialPosts(inputOverride);
+  }, [fetchInitialPosts, setShowFavoritesOnly]);
 
-   const handleLoadPreset = useCallback((preset: FeedPreset) => {
-        setSubredditInput(preset.subreddits);
-        setSortType(preset.sortType as SortType);
-        setTimeFrame(preset.timeFrame as TimeFrame);
-        setActivePresetName(preset.name);
-        fetchInitialPosts(preset.subreddits);
-   }, [fetchInitialPosts]);
+  // --- Masonry Breakpoint Configuration (uses grid density) ---
+  const breakpointColumnsObj = useMemo(() => ({
+    default: densityConfig.columns.wide,
+    1280: densityConfig.columns.desktop,
+    1024: densityConfig.columns.tablet,
+    768: densityConfig.columns.mobile,
+  }), [densityConfig]);
 
-   const handleUpdatePreset = useCallback((presetName: string) => {
-        const currentInput = subredditInput.trim();
-        if (!currentInput) { toast({ variant: "destructive", description: "Input field is empty." }); return; }
-        setPresets(prev => prev.map(p =>
-          p.name === presetName
-            ? { ...p, subreddits: currentInput, sortType, timeFrame, timestamp: Date.now() }
-            : p
-        ));
-        toast({ description: `Preset "${presetName}" updated.` });
-   }, [subredditInput, sortType, timeFrame, toast]);
-
-   const handleDeletePreset = useCallback((presetName: string) => {
-        if (window.confirm(`Delete preset "${presetName}"?`)) {
-            setPresets(prev => prev.filter(p => p.name !== presetName));
-            if (activePresetName === presetName) setActivePresetName(null);
-            toast({ description: `Preset "${presetName}" deleted.` });
-        }
-   }, [activePresetName, toast]);
-
-   const handleRenamePreset = useCallback((oldName: string) => {
-        const newName = window.prompt("Enter new name:", oldName);
-        if (newName === null) return;
-        const trimmed = newName.trim();
-        if (!trimmed) { toast({ variant: "destructive", description: "Name cannot be empty." }); return; }
-        if (trimmed !== oldName && presets.some(p => p.name === trimmed)) { toast({ variant: "destructive", description: `A preset named "${trimmed}" already exists.` }); return; }
-        setPresets(prev => prev.map(p => p.name === oldName ? { ...p, name: trimmed } : p));
-        if (activePresetName === oldName) setActivePresetName(trimmed);
-        toast({ description: `Preset renamed to "${trimmed}".` });
-   }, [presets, activePresetName, toast]);
-
-   // --- Scroll to Top Function ---
-   const scrollToTop = () => {
-    window.scrollTo({
-        top: 0,
-        behavior: 'smooth'
-    });
-};
-
-   // --- Masonry Breakpoint Configuration (uses grid density) ---
-   const breakpointColumnsObj = useMemo(() => ({
-     default: densityConfig.columns.wide,
-     1280: densityConfig.columns.desktop,
-     1024: densityConfig.columns.tablet,
-     768: densityConfig.columns.mobile
-   }), [densityConfig]);
-
-   // --- Render ---
+  // --- Render ---
   return (
     <div className="container mx-auto px-2 py-4 sm:px-4 sm:py-6 min-h-screen flex flex-col">
       {/* Header */}
@@ -1038,7 +628,7 @@ export default function Home() {
                         setTimeout(() => setShowSuggestions(false), 150);
                       }}
                       className="flex-grow text-base w-full"
-                      onKeyDown={(e) => { if (e.key === 'Enter' && !isLoading) fetchInitialPosts(); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && !isLoading) triggerFetch(); }}
                    />
                    {/* Suggestions Dropdown */}
                    {showSuggestions && suggestions.length > 0 && (
@@ -1062,7 +652,7 @@ export default function Home() {
                      </div>
                    )}
                  </div>
-                 <Button onClick={() => fetchInitialPosts()} disabled={isLoading} className="w-full sm:w-auto flex-shrink-0 active:scale-95 transition-transform">
+                 <Button onClick={() => triggerFetch()} disabled={isLoading} className="w-full sm:w-auto flex-shrink-0 active:scale-95 transition-transform">
                      {isLoading && posts.length === 0 ? "Fetching..." : "Fetch"}
                  </Button>
              </div>
@@ -1080,7 +670,7 @@ export default function Home() {
                    className="h-6 px-2 text-xs hover:bg-accent"
                    onClick={() => {
                      setSubredditInput(sub);
-                     setTimeout(() => fetchInitialPosts(), 0);
+                     setTimeout(() => triggerFetch(sub), 0);
                    }}
                  >
                    r/{sub}
@@ -1092,9 +682,9 @@ export default function Home() {
                <FeedPresetBar
                  presets={presets}
                  activePresetName={activePresetName}
-                 onLoadPreset={handleLoadPreset}
-                 onSavePreset={handleSavePreset}
-                 onUpdatePreset={handleUpdatePreset}
+                 onLoadPreset={onLoadPreset}
+                 onSavePreset={onSavePreset}
+                 onUpdatePreset={onUpdatePreset}
                  onDeletePreset={handleDeletePreset}
                  onRenamePreset={handleRenamePreset}
                  disabled={isLoading}
@@ -1196,7 +786,7 @@ export default function Home() {
                <Button
                  variant="outline"
                  size="sm"
-                 onClick={() => fetchInitialPosts()}
+                 onClick={() => triggerFetch()}
                  disabled={isLoading}
                  className="text-xs"
                >
@@ -1251,7 +841,7 @@ export default function Home() {
                   size="sm"
                   onClick={() => {
                     setSubredditInput(sub);
-                    setTimeout(() => fetchInitialPosts(), 0);
+                    setTimeout(() => triggerFetch(sub), 0);
                   }}
                   className="text-xs"
                 >
@@ -1275,11 +865,11 @@ export default function Home() {
                      ref={!showFavoritesOnly && postsToDisplay[postsToDisplay.length-1]===post ? lastPostRef : null}
                      className="mb-1.5" style={{ marginBottom: `${densityConfig.gap}px` }}
                      role="listitem">
-                 <Card onClick={()=> !isUnplayable && handleThumbnailClick(post)}
+                 <Card onClick={()=> !isUnplayable && openDialog(post)}
                        onKeyDown={(e) => {
                          if (!isUnplayable && (e.key === 'Enter' || e.key === ' ')) {
                            e.preventDefault();
-                           handleThumbnailClick(post);
+                           openDialog(post);
                          }
                        }}
                        tabIndex={isUnplayable ? -1 : 0}
@@ -1359,7 +949,7 @@ export default function Home() {
       )}
 
       {/* Fullscreen Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
+      <Dialog open={isDialogOpen} onOpenChange={closeDialog}>
         {/* Keep DialogContent itself without padding if needed */}
         <DialogContent className="max-w-none w-[95vw] h-[95vh] p-0 bg-transparent border-none overflow-hidden flex items-center justify-center">
 
@@ -1381,7 +971,7 @@ export default function Home() {
                     isUnplayableVideoFormat={selectedPost.isUnplayableVideoFormat ?? false}
                     onToggleFavorite={() => toggleFavorite(selectedPost)}
                     isFavorite={!!favorites[selectedPost.postId]}
-                    onClose={handleDialogClose}
+                    onClose={closeDialog}
                     onShare={() => handleShare(selectedPost)}
                     onDownload={() => handleDownload(selectedPost)}
                  />
