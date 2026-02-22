@@ -71,7 +71,7 @@ Return `posts` directly when `showFavoritesOnly` is false instead of spreading e
 
 ## PERF: Performance Improvements
 
-### REQ-PERF-01: Add LRU cap to in-memory cache
+### REQ-PERF-01: Add LRU cap to in-memory cache [COMPLETE - 02-01]
 Create `src/lib/lru-cache.ts` (~30 lines, Map-based). Replace unbounded `new Map()` in page.tsx with `new LRUCache(100)`.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §2.3
 - **Acceptance**: Cache capped at 100 entries, LRU eviction works, extended browsing doesn't grow memory unboundedly
@@ -173,7 +173,7 @@ Replace `<img>` with `<Image>` using `fill` layout + `sizes` prop. Add tiny SVG 
 
 ## TEST: Key Tests
 
-### REQ-TEST-01: LRU cache tests
+### REQ-TEST-01: LRU cache tests [COMPLETE - 02-01]
 Test `src/lib/lru-cache.ts`: get/set/has/delete, eviction at capacity, LRU ordering.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §2.3
 - **Acceptance**: Tests pass, cover core LRU behavior
