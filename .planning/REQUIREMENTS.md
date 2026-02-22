@@ -120,37 +120,37 @@ Create `src/hooks/use-fullscreen-dialog.ts` encapsulating: selectedPost, isDialo
 - **Source**: PERFORMANCE_REFACTOR_PLAN §3.7
 - **Acceptance**: Fullscreen dialog opens/closes identically
 
-### REQ-ARCH-07: Extract MediaCarousel component
+### REQ-ARCH-07: Extract MediaCarousel component [COMPLETE - 04-01]
 Move MediaCarousel (page.tsx lines 94-405) to `src/components/media-carousel.tsx`. Pure move, no logic changes.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §4.1
 - **Acceptance**: Component works identically from new file
 
-### REQ-ARCH-08: Extract PostCard component
+### REQ-ARCH-08: Extract PostCard component [COMPLETE - 04-02]
 Extract per-post card to `src/components/post-card.tsx` with React.forwardRef for IntersectionObserver.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §4.2
 - **Acceptance**: Cards render identically, ref forwarding works for infinite scroll
 
-### REQ-ARCH-09: Extract PostGrid component
+### REQ-ARCH-09: Extract PostGrid component [COMPLETE - 04-03]
 Extract masonry grid + skeleton loading + empty state to `src/components/post-grid.tsx`.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §4.3
 - **Acceptance**: Grid renders identically with all states
 
-### REQ-ARCH-10: Extract SubredditSearchBar component
+### REQ-ARCH-10: Extract SubredditSearchBar component [COMPLETE - 04-02]
 Extract input + suggestions + popular chips + fetch button to `src/components/subreddit-search-bar.tsx`.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §4.4
 - **Acceptance**: Search, suggestions, and fetch work identically
 
-### REQ-ARCH-11: Extract FeedControls component
+### REQ-ARCH-11: Extract FeedControls component [COMPLETE - 04-02]
 Extract collapsible controls (sort/timeframe, post search, grid density, favorites toggle) to `src/components/feed-controls.tsx`.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §4.5
 - **Acceptance**: All controls work identically
 
-### REQ-ARCH-12: Extract FullscreenDialog component
+### REQ-ARCH-12: Extract FullscreenDialog component [COMPLETE - 04-01]
 Extract fullscreen dialog + keyboard shortcuts dialog to `src/components/fullscreen-dialog.tsx`.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §4.6
 - **Acceptance**: Dialog and shortcuts work identically
 
-### REQ-ARCH-13: Slim page.tsx to ~150 lines
+### REQ-ARCH-13: Slim page.tsx to ~150 lines [COMPLETE - 04-03]
 Page becomes pure orchestrator: hooks at top, ~6 local state vars, event handler wiring, JSX composition.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §4.7
 - **Acceptance**: page.tsx ≤ 200 lines, all functionality preserved

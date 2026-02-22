@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Quick Wins** - Remove dead code, fix low-hanging bugs, add cache headers (completed 2026-02-22)
 - [x] **Phase 2: Performance Bug Fixes** - Fix scroll/memo perf bugs, add LRU cache with tests (completed 2026-02-22)
 - [x] **Phase 3: Extract Custom Hooks** - Extract business logic into 5 hooks with shared types and granular DB ops (completed 2026-02-22)
-- [ ] **Phase 4: Extract Components** - Extract 6 UI components, slim page.tsx to orchestrator
+- [x] **Phase 4: Extract Components** - Extract 6 UI components, slim page.tsx to orchestrator (completed 2026-02-22)
 - [ ] **Phase 5: next/image Integration** - Replace raw img tags with next/image for automatic optimization
 
 ## Phase Details
@@ -171,5 +171,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 1. Quick Wins | 2/2 | Complete   | 2026-02-22 |
 | 2. Performance Bug Fixes | 2/2 | Complete   | 2026-02-22 |
 | 3. Extract Custom Hooks | 4/4 | Complete   | 2026-02-22 |
-| 4. Extract Components | 2/3 | In Progress|  |
+| 4. Extract Components | 3/3 | Complete   | 2026-02-22 |
 | 5. next/image Integration | 0/? | Not started | - |

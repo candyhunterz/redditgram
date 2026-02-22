@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 ## Current Position
 
 Phase: 4 of 5 (Extract Components)
-Plan: 2 of 3 in current phase (COMPLETE)
-Status: In progress
-Last activity: 2026-02-22 -- Completed Plan 04-02 (extract SubredditSearchBar, FeedControls, PostCard from page.tsx)
+Plan: 3 of 3 in current phase (COMPLETE)
+Status: Phase complete
+Last activity: 2026-02-22 -- Completed Plan 04-03 (extract PostGrid, slim page.tsx to 191 lines, clean tech debt)
 
-Progress: [=========.] 81%
+Progress: [==========] 90%
 
 ## Performance Metrics
 
@@ -47,6 +47,7 @@ Progress: [=========.] 81%
 | Phase 03-extract-custom-hooks P04 | 2 | 2 tasks | 3 files |
 | Phase 04-extract-components P01 | 8 | 2 tasks | 3 files |
 | Phase 04-extract-components P02 | 4 | 2 tasks | 4 files |
+| Phase 04-extract-components P03 | 4 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -84,6 +85,9 @@ Recent decisions affecting current work:
 - [Phase 04-02]: SubredditSearchBar owns suggestions and showSuggestions state — removes two state vars from page.tsx
 - [Phase 04-02]: FeedControls owns isControlsOpen state — removes one state var from page.tsx
 - [Phase 04-02]: PostCard uses React.forwardRef so IntersectionObserver lastPostRef can be forwarded from page.tsx
+- [Phase 04-03]: Error block moved from page.tsx header into PostGrid — error display is content-related, not header-related
+- [Phase 04-03]: PostGrid receives rawPostCount separately from posts (filtered) to correctly distinguish initial load skeleton from no-results state
+- [Phase 04-03]: route.ts imports RedditPost/SortType/TimeFrame from @/services/reddit — type import erased at compile time, no runtime cross-boundary issue
 
 ### Pending Todos
 
@@ -96,5 +100,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 04-02-PLAN.md (extract SubredditSearchBar, FeedControls, PostCard from page.tsx)
+Stopped at: Completed 04-03-PLAN.md (extract PostGrid, slim page.tsx to 191 lines, clean tech debt)
 Resume file: None
