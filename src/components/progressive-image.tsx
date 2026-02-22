@@ -15,6 +15,30 @@ interface ProgressiveImageProps {
   onError?: () => void;
 }
 
+const getThumbnailSrc = (url: string): string => {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname;
+
+    if (hostname === 'i.redd.it') {
+      // i.redd.it supports the 'm' suffix convention (e.g., abc.jpg -> abcm.jpg)
+      return url.replace(/\.(jpg|jpeg|png|gif|webp)$/i, 'm.$1');
+    }
+
+    if (hostname === 'preview.redd.it' || hostname === 'external-preview.redd.it') {
+      // preview.redd.it uses width query param; reduce to 108 for blur placeholder
+      parsed.searchParams.set('width', '108');
+      return parsed.toString();
+    }
+
+    // Unknown host: return original (no blur placeholder, graceful fallback)
+    return url;
+  } catch {
+    // Invalid URL: return original
+    return url;
+  }
+};
+
 export const ProgressiveImage: React.FC<ProgressiveImageProps> = ({
   src,
   alt,
@@ -28,8 +52,8 @@ export const ProgressiveImage: React.FC<ProgressiveImageProps> = ({
   const imgRef = useRef<HTMLImageElement>(null);
 
   // Create a tiny thumbnail URL from Reddit's CDN
-  // Reddit provides different sizes, we can try to construct a smaller version
-  const thumbnailSrc = src.replace(/\.(jpg|jpeg|png|gif|webp)$/i, 'm.$1');
+  // Handles i.redd.it (m suffix), preview.redd.it and external-preview.redd.it (width param)
+  const thumbnailSrc = getThumbnailSrc(src);
 
   useEffect(() => {
     // If image is already cached, it will load immediately
