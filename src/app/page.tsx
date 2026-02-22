@@ -4,7 +4,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 // *** Standard Imports ***
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowUp, Sun, Moon, Keyboard, Settings } from "lucide-react";
+import { ArrowUp, Sun, Moon, Keyboard, Settings } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { useSubredditHistory } from "@/hooks/use-subreddit-history";
 import { sharePost } from "@/lib/share";
@@ -13,13 +13,11 @@ import { usePostSearch } from "@/hooks/use-post-search";
 import { useGridDensity } from "@/hooks/use-grid-density";
 import { useSettings } from "@/hooks/use-settings";
 import { SettingsModal } from "@/components/settings-modal";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { FullscreenDialog, KeyboardShortcutsDialog } from '@/components/fullscreen-dialog';
 import { SubredditSearchBar } from '@/components/subreddit-search-bar';
 import { FeedControls } from '@/components/feed-controls';
-import { PostCard } from '@/components/post-card';
-import Masonry from 'react-masonry-css';
+import { PostGrid } from '@/components/post-grid';
 import { FeedPreset } from '@/lib/indexed-db';
 import { FeedPresetBar } from '@/components/feed-preset-bar';
 // *** Custom Hooks ***
@@ -45,7 +43,7 @@ export default function Home() {
 
   const { toast } = useToast();
   const { theme, toggleTheme } = useTheme();
-  const { history: subredditHistory, addToHistory, getSuggestions } = useSubredditHistory();
+  const { addToHistory, getSuggestions } = useSubredditHistory();
 
   // Centralized settings
   const {
@@ -70,12 +68,10 @@ export default function Home() {
   // -----------------------------------------------------------------------
   const { showScrollTop, scrollToTop } = useScrollToTop();
   const { selectedPost, isDialogOpen, openDialog, closeDialog } = useFullscreenDialog();
-  const { favorites, showFavoritesOnly, setShowFavoritesOnly, favoritesLoadComplete, toggleFavorite } = useFavorites();
+  const { favorites, showFavoritesOnly, setShowFavoritesOnly, toggleFavorite } = useFavorites();
   const {
     presets,
     activePresetName,
-    setActivePresetName,
-    initialLoadComplete,
     handleSavePreset,
     handleLoadPreset,
     handleUpdatePreset,
@@ -89,7 +85,6 @@ export default function Home() {
     hasMore,
     fetchInitiated,
     fetchInitialPosts,
-    loadMorePosts,
     lastPostRef,
   } = useRedditPosts({
     subredditInput,
@@ -106,13 +101,9 @@ export default function Home() {
     let result: RedditPost[];
 
     if (!showFavoritesOnly) {
-        // When showing all posts, return the fetched posts array directly.
-        // isUnplayableVideoFormat is already set by the API route on every post object.
         result = posts;
     } else {
-        // When showing only favorites, map the favorites map values
         result = Object.values(favorites).map((favInfo): RedditPost => {
-            // Use stored arrays; fall back to thumbnailUrl for old favorites
             const mediaUrls = favInfo.mediaUrls?.length ? favInfo.mediaUrls
                 : (favInfo.thumbnailUrl ? [favInfo.thumbnailUrl] : []);
             const fullQualityUrls = favInfo.fullQualityUrls?.length ? favInfo.fullQualityUrls
@@ -133,7 +124,7 @@ export default function Home() {
   }, [posts, favorites, showFavoritesOnly]);
 
   // Apply search filter
-  const { searchQuery, setSearchQuery, filteredPosts: postsToDisplay, clearSearch, highlightMatch } = usePostSearch(basePosts);
+  const { searchQuery, setSearchQuery, filteredPosts: postsToDisplay, clearSearch } = usePostSearch(basePosts);
 
   // -----------------------------------------------------------------------
   // Preset wiring — thin wrapper to orchestrate hook + page-level state
@@ -203,7 +194,7 @@ export default function Home() {
     fetchInitialPosts(inputOverride);
   }, [fetchInitialPosts, setShowFavoritesOnly]);
 
-  // --- Masonry Breakpoint Configuration (uses grid density) ---
+  // --- Breakpoint Configuration for PostGrid (uses grid density) ---
   const breakpointColumnsObj = useMemo(() => ({
     default: densityConfig.columns.wide,
     1280: densityConfig.columns.desktop,
@@ -294,109 +285,31 @@ export default function Home() {
               favoritesCount={Object.keys(favorites).length}
             />
          </div>
-         {/* Error Message - Improved */}
-         {error && (
-           <div className="mt-4 p-4 rounded-lg bg-destructive/10 border border-destructive/20 max-w-md mx-auto">
-             <p className="text-destructive text-center text-sm font-medium mb-3">{error}</p>
-             <div className="flex justify-center gap-2">
-               <Button
-                 variant="outline"
-                 size="sm"
-                 onClick={() => triggerFetch()}
-                 disabled={isLoading}
-                 className="text-xs"
-               >
-                 {isLoading ? (
-                   <>
-                     <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                     Retrying...
-                   </>
-                 ) : (
-                   'Try Again'
-                 )}
-               </Button>
-             </div>
-           </div>
-         )}
       </header>
 
-      {/* Main Content Area */}
-      <main className="flex-grow mt-2" role="main" aria-label="Reddit posts gallery">
-        {/* Screen reader live region for status updates */}
-        <div className="sr-only" aria-live="polite" aria-atomic="true">
-          {isLoading && posts.length === 0 ? 'Loading posts...' : ''}
-          {isLoading && posts.length > 0 ? 'Loading more posts...' : ''}
-          {!isLoading && postsToDisplay.length > 0 ? `Showing ${postsToDisplay.length} posts` : ''}
-          {!isLoading && fetchInitiated && postsToDisplay.length === 0 ? 'No posts found' : ''}
-        </div>
+      {/* Post Grid (includes error display, loading states, masonry grid) */}
+      <PostGrid
+        posts={postsToDisplay}
+        isLoading={isLoading}
+        hasMore={hasMore}
+        fetchInitiated={fetchInitiated}
+        showFavoritesOnly={showFavoritesOnly}
+        error={error}
+        favorites={favorites}
+        breakpointColumnsObj={breakpointColumnsObj}
+        gridStyle={gridStyle}
+        densityGap={densityConfig.gap}
+        lastPostRef={lastPostRef}
+        onToggleFavorite={toggleFavorite}
+        onOpenDialog={openDialog}
+        onRetry={() => triggerFetch()}
+        rawPostCount={posts.length}
+        onSubredditClick={(sub) => {
+          setSubredditInput(sub);
+          setTimeout(() => triggerFetch(sub), 0);
+        }}
+      />
 
-        {/* Initial Loading Skeletons */}
-        {isLoading && posts.length === 0 && !error && (
-            <Masonry breakpointCols={breakpointColumnsObj} className="my-masonry-grid flex gap-1.5" columnClassName="my-masonry-grid_column">
-                 {Array.from({ length: 18 }).map((_, index) => ( <Skeleton key={`skeleton-${index}`} className="h-64 w-full mb-1.5" /> ))}
-            </Masonry>
-        )}
-        {/* No Posts Message - Improved */}
-        {fetchInitiated && postsToDisplay.length === 0 && !isLoading && !error && (
-          <div className="text-center mt-10 space-y-4">
-            <p className="text-muted-foreground text-lg">No posts found</p>
-            <div className="text-sm text-muted-foreground/80 max-w-md mx-auto space-y-2">
-              <p>Try the following:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li>Check the subreddit name spelling</li>
-                <li>Try a different time frame for &quot;Top&quot; posts</li>
-                <li>Some subreddits may have less media content</li>
-              </ul>
-            </div>
-            <div className="flex flex-wrap justify-center gap-2 mt-4">
-              <p className="text-xs text-muted-foreground w-full">Popular subreddits:</p>
-              {['pics', 'aww', 'funny', 'memes', 'earthporn'].map((sub) => (
-                <Button
-                  key={sub}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setSubredditInput(sub);
-                    setTimeout(() => triggerFetch(sub), 0);
-                  }}
-                  className="text-xs"
-                >
-                  r/{sub}
-                </Button>
-              ))}
-            </div>
-          </div>
-        )}
-        {/* Posts Grid */}
-        {postsToDisplay.length > 0 && (
-          <Masonry breakpointCols={breakpointColumnsObj} className="my-masonry-grid flex" columnClassName="my-masonry-grid_column" style={gridStyle} role="list" aria-label="Media posts">
-            {postsToDisplay.map((post, index) => {
-              const isLast = !showFavoritesOnly && index === postsToDisplay.length - 1;
-              return (
-                <PostCard
-                  key={`${post.subreddit}-${post.postId}`}
-                  ref={isLast ? lastPostRef : null}
-                  post={post}
-                  isFavorite={!!favorites[post.postId]}
-                  onToggleFavorite={() => toggleFavorite(post)}
-                  onClick={() => openDialog(post)}
-                  gap={densityConfig.gap}
-                />
-              );
-            })}
-           </Masonry>
-        )}
-        {/* Loading More Indicator */}
-        {isLoading && postsToDisplay.length > 0 && !showFavoritesOnly && (
-          <div className="flex justify-center items-center gap-2 text-center mt-6 p-4 text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" /> Loading more...
-          </div>
-        )}
-        {/* End Reached Message */}
-        {!hasMore && fetchInitiated && postsToDisplay.length > 0 && !showFavoritesOnly && (
-          <p className="text-center mt-6 p-4 text-muted-foreground">You've reached the end!</p>
-        )}
-      </main>
        {/* --- Scroll-to-Top Button --- */}
       {showScrollTop && (
           <Button
