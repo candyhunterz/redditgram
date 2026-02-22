@@ -4,12 +4,9 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 // *** Standard Imports ***
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
-import { Video, Copy as GalleryIcon, Loader2, ArrowUp, Sun, Moon, ArrowUpCircle, MessageCircle, Keyboard, Settings } from "lucide-react";
+import { Loader2, ArrowUp, Sun, Moon, Keyboard, Settings } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { useSubredditHistory } from "@/hooks/use-subreddit-history";
-import { formatRelativeTime, formatNumber } from "@/lib/format-time";
 import { sharePost } from "@/lib/share";
 import { downloadMedia } from "@/lib/download";
 import { usePostSearch } from "@/hooks/use-post-search";
@@ -21,8 +18,8 @@ import { useToast } from "@/hooks/use-toast";
 import { FullscreenDialog, KeyboardShortcutsDialog } from '@/components/fullscreen-dialog';
 import { SubredditSearchBar } from '@/components/subreddit-search-bar';
 import { FeedControls } from '@/components/feed-controls';
+import { PostCard } from '@/components/post-card';
 import Masonry from 'react-masonry-css';
-import { MediaCarousel } from '@/components/media-carousel';
 import { FeedPreset } from '@/lib/indexed-db';
 import { FeedPresetBar } from '@/components/feed-preset-bar';
 // *** Custom Hooks ***
@@ -374,72 +371,18 @@ export default function Home() {
         {postsToDisplay.length > 0 && (
           <Masonry breakpointCols={breakpointColumnsObj} className="my-masonry-grid flex" columnClassName="my-masonry-grid_column" style={gridStyle} role="list" aria-label="Media posts">
             {postsToDisplay.map((post, index) => {
-                const firstUrl=post?.mediaUrls?.[0];
-                const isVideoPost=firstUrl&&firstUrl.endsWith('.mp4');
-                const isGalleryPost=post?.mediaUrls?.length>1;
-                const isUnplayable = post.isUnplayableVideoFormat ?? false;
-                const mediaType = isVideoPost ? 'video' : isGalleryPost ? 'gallery' : 'image';
-                return (
-                <div key={`${post.subreddit}-${post.postId}`}
-                     ref={!showFavoritesOnly && postsToDisplay[postsToDisplay.length-1]===post ? lastPostRef : null}
-                     className="mb-1.5" style={{ marginBottom: `${densityConfig.gap}px` }}
-                     role="listitem">
-                 <Card onClick={()=> !isUnplayable && openDialog(post)}
-                       onKeyDown={(e) => {
-                         if (!isUnplayable && (e.key === 'Enter' || e.key === ' ')) {
-                           e.preventDefault();
-                           openDialog(post);
-                         }
-                       }}
-                       tabIndex={isUnplayable ? -1 : 0}
-                       role="button"
-                       aria-label={`${post.title} - ${mediaType} from r/${post.subreddit}${post.ups ? `, ${formatNumber(post.ups)} upvotes` : ''}${favorites[post.postId] ? ', favorited' : ''}`}
-                       className={cn(
-                            "group relative overflow-hidden bg-gray-100 dark:bg-gray-800 flex items-center justify-center transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
-                            !isUnplayable && "hover:shadow-lg hover:scale-[1.02] active:scale-95 cursor-pointer",
-                            isUnplayable && "cursor-default"
-                       )}>
-                     {/* Indicators */}
-                     {(isVideoPost || isGalleryPost || isUnplayable) && (
-                        <div className="absolute top-1 right-1 z-20 p-1 rounded-full bg-black/40 text-white transition-opacity opacity-70 group-hover:opacity-100">
-                            {isUnplayable ? <Video className="h-3 w-3 opacity-70"/> :
-                             isVideoPost ? <Video className="h-3 w-3"/> :
-                             <GalleryIcon className="h-3 w-3"/>}
-                        </div>
-                     )}
-                     {/* Metadata Overlay */}
-                     <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/70 via-black/40 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                       <div className="flex items-center justify-between text-white text-xs">
-                         <div className="flex items-center gap-2">
-                           <span className="flex items-center gap-0.5" title="Upvotes">
-                             <ArrowUpCircle className="h-3 w-3" />
-                             {formatNumber(post.ups ?? 0)}
-                           </span>
-                           <span className="flex items-center gap-0.5" title="Comments">
-                             <MessageCircle className="h-3 w-3" />
-                             {formatNumber(post.numComments ?? 0)}
-                           </span>
-                         </div>
-                         {post.createdUtc && (
-                           <span className="text-white/80" title={new Date((post.createdUtc ?? 0) * 1000).toLocaleString()}>
-                             {formatRelativeTime(post.createdUtc)}
-                           </span>
-                         )}
-                       </div>
-                     </div>
-                     {/* Grid Item Media Carousel */}
-                     <MediaCarousel
-                        mediaUrls={post.mediaUrls}
-                        fullQualityUrls={post.fullQualityUrls}
-                        title={post.title}
-                        subreddit={post.subreddit}
-                        postId={post.postId}
-                        isUnplayableVideoFormat={isUnplayable}
-                        onToggleFavorite={() => toggleFavorite(post)}
-                        isFavorite={!!favorites[post.postId]}
-                     />
-                 </Card>
-                </div>);
+              const isLast = !showFavoritesOnly && index === postsToDisplay.length - 1;
+              return (
+                <PostCard
+                  key={`${post.subreddit}-${post.postId}`}
+                  ref={isLast ? lastPostRef : null}
+                  post={post}
+                  isFavorite={!!favorites[post.postId]}
+                  onToggleFavorite={() => toggleFavorite(post)}
+                  onClick={() => openDialog(post)}
+                  gap={densityConfig.gap}
+                />
+              );
             })}
            </Masonry>
         )}
