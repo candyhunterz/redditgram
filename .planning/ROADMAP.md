@@ -53,7 +53,7 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md -- Create and test LRU cache with TDD (Red-Green-Refactor)
-- [ ] 02-02-PLAN.md -- Fix scroll-to-top re-render loop, basePosts spread, integrate LRU cache
+- [x] 02-02-PLAN.md -- Fix scroll-to-top re-render loop, basePosts spread, integrate LRU cache
 
 **Risk/Dependencies**: Low -- targeted fixes with clear before/after behavior. Each fix is independent and testable.
 
@@ -160,7 +160,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Quick Wins | 2/2 | Complete   | 2026-02-22 |
-| 2. Performance Bug Fixes | 1/2 | In progress | - |
+| 2. Performance Bug Fixes | 2/3 | In progress | - |
 | 3. Extract Custom Hooks | 0/? | Not started | - |
 | 4. Extract Components | 0/? | Not started | - |
 | 5. next/image Integration | 0/? | Not started | - |

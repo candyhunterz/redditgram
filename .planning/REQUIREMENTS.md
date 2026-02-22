@@ -57,12 +57,12 @@ Change "Check console." toast to "Some subreddits could not be loaded."
 - **Source**: PERFORMANCE_REFACTOR_PLAN §1.6
 - **Acceptance**: User-facing error messages are actionable
 
-### REQ-BUGFIX-04: Fix scroll-to-top re-render loop
+### REQ-BUGFIX-04: Fix scroll-to-top re-render loop [COMPLETE - 02-02]
 In page.tsx: remove `showScrollTop` from useEffect deps, use a ref to track current value, empty deps array, add `{ passive: true }`.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §2.1
 - **Acceptance**: Scroll listener not re-attached on every toggle, passive listening enabled
 
-### REQ-BUGFIX-05: Fix basePosts useMemo unnecessary spread
+### REQ-BUGFIX-05: Fix basePosts useMemo unnecessary spread [COMPLETE - 02-02]
 Return `posts` directly when `showFavoritesOnly` is false instead of spreading every post object.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §2.2
 - **Acceptance**: No unnecessary object allocations when viewing normal feed
@@ -71,7 +71,7 @@ Return `posts` directly when `showFavoritesOnly` is false instead of spreading e
 
 ## PERF: Performance Improvements
 
-### REQ-PERF-01: Add LRU cap to in-memory cache [COMPLETE - 02-01]
+### REQ-PERF-01: Add LRU cap to in-memory cache [COMPLETE - 02-01, 02-02]
 Create `src/lib/lru-cache.ts` (~30 lines, Map-based). Replace unbounded `new Map()` in page.tsx with `new LRUCache(100)`.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §2.3
 - **Acceptance**: Cache capped at 100 entries, LRU eviction works, extended browsing doesn't grow memory unboundedly
