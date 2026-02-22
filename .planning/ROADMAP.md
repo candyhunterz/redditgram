@@ -69,10 +69,13 @@ Plans:
   3. IndexedDB favorite toggle is O(1) single-record put/delete instead of clear-and-rewrite-all
   4. IndexedDB preset operations (save, delete, rename) are granular single-record ops
   5. All tests pass: granular IndexedDB ops, hook state transitions, and all existing tests
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 03-01: TBD
+- [ ] 03-01-PLAN.md -- Create shared types file and TDD granular IndexedDB operations
+- [ ] 03-02-PLAN.md -- Extract use-scroll-to-top, use-fullscreen-dialog, use-favorites, use-feed-presets hooks
+- [ ] 03-03-PLAN.md -- Extract use-reddit-posts hook and rewire page.tsx to consume all 5 hooks
+- [ ] 03-04-PLAN.md -- Write tests for use-favorites, use-feed-presets, and use-reddit-posts hooks
 
 **Risk/Dependencies**: Medium -- this is the largest refactor phase. State coordination between hooks must be preserved exactly. The hooks must expose the same interface that page.tsx currently uses inline. Depends on Phase 2 LRU cache being available.
 
