@@ -333,6 +333,95 @@ export async function saveAllLists(presets: FeedPreset[]): Promise<void> {
 }
 
 // ========================================================================
+// GRANULAR FAVORITES OPERATIONS (O(1) single-record IDB ops)
+// ========================================================================
+
+/**
+ * Add or overwrite a single favorite record by postId.
+ * O(1) — single IDB put operation, no clear+rewrite.
+ */
+export async function putFavorite(
+  postId: string,
+  data: {
+    title: string;
+    subreddit: string;
+    thumbnailUrl?: string;
+    mediaUrls?: string[];
+    fullQualityUrls?: string[];
+  }
+): Promise<void> {
+  try {
+    const db = await getDB();
+    await db.put('favorites', { postId, ...data, timestamp: Date.now() });
+  } catch (error) {
+    console.error('Error putting favorite:', error);
+  }
+}
+
+/**
+ * Delete a single favorite record by postId.
+ * O(1) — single IDB delete operation, no clear+rewrite.
+ */
+export async function deleteFavorite(postId: string): Promise<void> {
+  try {
+    const db = await getDB();
+    await db.delete('favorites', postId);
+  } catch (error) {
+    console.error('Error deleting favorite:', error);
+  }
+}
+
+// ========================================================================
+// GRANULAR PRESET OPERATIONS (O(1) single-record IDB ops)
+// ========================================================================
+
+/**
+ * Add or overwrite a single preset record by name.
+ * O(1) — single IDB put operation, no clear+rewrite.
+ */
+export async function putPreset(preset: FeedPreset): Promise<void> {
+  try {
+    const db = await getDB();
+    await db.put('savedLists', preset);
+  } catch (error) {
+    console.error('Error putting preset:', error);
+  }
+}
+
+/**
+ * Delete a single preset record by name.
+ * O(1) — single IDB delete operation, no clear+rewrite.
+ */
+export async function deletePreset(name: string): Promise<void> {
+  try {
+    const db = await getDB();
+    await db.delete('savedLists', name);
+  } catch (error) {
+    console.error('Error deleting preset:', error);
+  }
+}
+
+/**
+ * Rename a preset: reads old record, writes new record with updated name,
+ * then deletes the old record — all in a single readwrite transaction.
+ * If oldName does not exist, does nothing.
+ */
+export async function renamePreset(oldName: string, newName: string): Promise<void> {
+  try {
+    const db = await getDB();
+    const tx = db.transaction('savedLists', 'readwrite');
+    const old = await tx.store.get(oldName);
+    if (old) {
+      await tx.store.put({ ...old, name: newName });
+      await tx.store.delete(oldName);
+    }
+    await tx.done;
+  } catch (error) {
+    console.error('Error renaming preset:', error);
+  }
+}
+
+// ========================================================================
 // UTILITY
 // ========================================================================
 
