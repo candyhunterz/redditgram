@@ -49,10 +49,11 @@ Plans:
   2. Viewing the normal feed (not favorites) does not spread/copy every post object on memo recalculation
   3. In-memory post cache is capped at 100 entries with LRU eviction -- extended browsing does not grow memory unboundedly
   4. LRU cache unit tests pass covering get/set/has/delete, eviction at capacity, and LRU ordering
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: TBD
+- [ ] 02-01-PLAN.md -- Create and test LRU cache with TDD (Red-Green-Refactor)
+- [ ] 02-02-PLAN.md -- Fix scroll-to-top re-render loop, basePosts spread, integrate LRU cache
 
 **Risk/Dependencies**: Low -- targeted fixes with clear before/after behavior. Each fix is independent and testable.
 
