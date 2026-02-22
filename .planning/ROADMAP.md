@@ -164,6 +164,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 |-------|----------------|--------|-----------|
 | 1. Quick Wins | 2/2 | Complete   | 2026-02-22 |
 | 2. Performance Bug Fixes | 2/3 | In progress | - |
-| 3. Extract Custom Hooks | 0/? | Not started | - |
+| 3. Extract Custom Hooks | 1/4 | In Progress|  |
 | 4. Extract Components | 0/? | Not started | - |
 | 5. next/image Integration | 0/? | Not started | - |

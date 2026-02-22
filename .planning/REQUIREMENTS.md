@@ -76,7 +76,7 @@ Create `src/lib/lru-cache.ts` (~30 lines, Map-based). Replace unbounded `new Map
 - **Source**: PERFORMANCE_REFACTOR_PLAN §2.3
 - **Acceptance**: Cache capped at 100 entries, LRU eviction works, extended browsing doesn't grow memory unboundedly
 
-### REQ-PERF-02: Add granular IndexedDB operations
+### REQ-PERF-02: Add granular IndexedDB operations [COMPLETE - 03-01]
 In `src/lib/indexed-db.ts`: add `putFavorite(postId, data)`, `deleteFavorite(postId)`, `putPreset(preset)`, `deletePreset(name)`, `renamePreset(oldName, newName)` — single-record ops instead of clear+rewrite-all.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §3.2
 - **Acceptance**: Favorite toggle is O(1) instead of O(n), preset operations are granular
@@ -90,7 +90,7 @@ In `src/app/api/reddit/route.ts`: add `Cache-Control: public, s-maxage=60, stale
 
 ## ARCH: Architecture Extraction
 
-### REQ-ARCH-01: Create shared types file
+### REQ-ARCH-01: Create shared types file [COMPLETE - 03-01]
 Create `src/types/reddit.ts` with types and pure helpers moved from page.tsx: `CachedRedditResponse`, `CacheKey`, `FavoritePostInfo`, `FavoritesMap`, `isValidSubreddit`, `parseSubreddits`, `interleavePosts`, `generateCacheKey`, `POSTS_PER_LOAD`.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §3.1
 - **Acceptance**: Types importable from `@/types/reddit`, page.tsx imports from new location
@@ -178,7 +178,7 @@ Test `src/lib/lru-cache.ts`: get/set/has/delete, eviction at capacity, LRU order
 - **Source**: PERFORMANCE_REFACTOR_PLAN §2.3
 - **Acceptance**: Tests pass, cover core LRU behavior
 
-### REQ-TEST-02: Granular IndexedDB operation tests
+### REQ-TEST-02: Granular IndexedDB operation tests [COMPLETE - 03-01]
 Test putFavorite, deleteFavorite, putPreset, deletePreset, renamePreset.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §3.2
 - **Acceptance**: Tests pass, cover single-record CRUD
