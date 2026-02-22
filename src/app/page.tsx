@@ -18,7 +18,6 @@ import { downloadMedia } from "@/lib/download";
 import { usePostSearch } from "@/hooks/use-post-search";
 import { useGridDensity, DENSITY_CONFIG } from "@/hooks/use-grid-density";
 import { useSettings } from "@/hooks/use-settings";
-import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { SettingsModal } from "@/components/settings-modal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -655,7 +654,6 @@ export default function Home() {
 
         // Check in-memory cache first (fastest)
         if (apiCache.has(cacheKey)) {
-            console.log(`%cMemory Cache HIT for key: ${cacheKey}`, 'color: green');
             const cachedData = apiCache.get(cacheKey)!;
             const postsWithMetadata = cachedData.posts.map(p => ({
                 ...p,
@@ -673,7 +671,6 @@ export default function Home() {
                 (async () => {
                     const idbCached = await getCachedPosts(cacheKey);
                     if (idbCached) {
-                        console.log(`%cIndexedDB Cache HIT for key: ${cacheKey}`, 'color: blue');
                         // Store in memory cache for faster subsequent access
                         apiCache.set(cacheKey, { posts: idbCached.posts, after: idbCached.after });
                         const postsWithMetadata = idbCached.posts.map(p => ({
@@ -685,7 +682,6 @@ export default function Home() {
                     }
 
                     // Cache miss - fetch from API
-                    console.log(`%cCache MISS for key: ${cacheKey}`, 'color: orange');
                     const response = await getPosts(sub, currentSortType, {
                         timeFrame: currentSortType === 'top' ? currentTimeFrame : undefined,
                         after: afterParam,
@@ -700,7 +696,6 @@ export default function Home() {
                         sortType: currentSortType,
                         timeFrame: currentSortType === 'top' ? currentTimeFrame : undefined,
                     });
-                    console.log(`%cStored in both caches: ${cacheKey}`, 'color: purple');
 
                     const postsWithMetadata = response.posts.map(p => ({
                         ...p,
@@ -733,7 +728,7 @@ export default function Home() {
         });
 
        if (overallError && successfulResults.length === 0) throw new Error(`All subreddit fetches failed. First error: ${overallError}`);
-       else if (overallError) toast({ variant: "destructive", title: "Fetch Warning", description: `Could not load some subreddits. Check console.`});
+       else if (overallError) toast({ variant: "destructive", title: "Fetch Warning", description: "Some subreddits could not be loaded." });
 
       const groupedPosts = successfulResults.map(res => res.posts);
       const anyHasMore = Object.values(updatedAfterTokens).some(token => token !== null);
@@ -761,12 +756,10 @@ export default function Home() {
         setPosts([]); setFetchInitiated(false); setHasMore(false); return;
      }
 
-     console.log("Clearing initial cache for relevant keys...");
      subsToUse.forEach(sub => {
          const initialCacheKey = generateCacheKey(sub, sortType, sortType === 'top' ? timeFrame : undefined, undefined);
          if (apiCache.has(initialCacheKey)) {
              apiCache.delete(initialCacheKey);
-             console.log(`%cCleared initial cache key: ${initialCacheKey}`, 'color: red');
          }
      });
 

@@ -157,11 +157,9 @@ const extractFullQualityUrls = (postDetail: any): string[] => {
 async function getAccessToken(): Promise<string> {
     const cachedToken = await kv.get<string>('reddit_access_token');
     if (cachedToken) {
-        console.log('[AUTH_LOG] Using cached access token.');
         return cachedToken;
     }
 
-    console.log('[AUTH_LOG] Fetching new access token from Reddit...');
     const clientId = process.env.REDDIT_CLIENT_ID;
     const clientSecret = process.env.REDDIT_CLIENT_SECRET;
 
@@ -191,7 +189,6 @@ async function getAccessToken(): Promise<string> {
     const expiresIn = data.expires_in;
 
     await kv.set('reddit_access_token', token, { ex: expiresIn - 60 });
-    console.log('[AUTH_LOG] Successfully fetched and cached new token.');
 
     return token;
 }
@@ -305,7 +302,10 @@ export async function GET(request: NextRequest) {
             })
             .filter((post: RedditPost | null): post is RedditPost => post !== null);
 
-        return NextResponse.json({ posts, after: data.data.after });
+        return NextResponse.json(
+            { posts, after: data.data.after },
+            { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
+        );
 
     } catch (error: any) {
         console.error(`[GLOBAL_HANDLER_ERROR] An unexpected error occurred:`, error);
