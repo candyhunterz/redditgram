@@ -19,12 +19,7 @@ import { useSettings } from "@/hooks/use-settings";
 import { SettingsModal } from "@/components/settings-modal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { FullscreenDialog, KeyboardShortcutsDialog } from '@/components/fullscreen-dialog';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import {
@@ -633,94 +628,21 @@ export default function Home() {
       )}
 
       {/* Fullscreen Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={closeDialog}>
-        {/* Keep DialogContent itself without padding if needed */}
-        <DialogContent className="max-w-none w-[95vw] h-[95vh] p-0 bg-transparent border-none overflow-hidden flex items-center justify-center">
-
-           {/* *** MODIFIED: Added padding (e.g., p-4) to this inner wrapper *** */}
-           <div className="relative w-full h-full flex items-center justify-center bg-black/90 backdrop-blur-sm p-6">
-              {/* --- Content Starts Below --- */}
-
-              <DialogTitle className="sr-only"> Expanded view: {selectedPost?.title || 'Reddit Post'} </DialogTitle>
-              <DialogDescription className="sr-only"> Expanded view of Reddit post: {selectedPost?.title || 'Content'}... </DialogDescription>
-
-              {selectedPost ? (
-                 <MediaCarousel
-                    mediaUrls={selectedPost.mediaUrls}
-                    fullQualityUrls={selectedPost.fullQualityUrls}
-                    title={selectedPost.title}
-                    subreddit={selectedPost.subreddit}
-                    postId={selectedPost.postId}
-                    isFullScreen={true}
-                    isUnplayableVideoFormat={selectedPost.isUnplayableVideoFormat ?? false}
-                    onToggleFavorite={() => toggleFavorite(selectedPost)}
-                    isFavorite={!!favorites[selectedPost.postId]}
-                    onClose={closeDialog}
-                    onShare={() => handleShare(selectedPost)}
-                    onDownload={() => handleDownload(selectedPost)}
-                 />
-              ) : ( <div className="text-white text-xl">Loading content...</div> )}
-
-              {/* The Close Button is now rendered INSIDE MediaCarousel */}
-
-              {/* --- Content Ends Above --- */}
-           </div>
-           {/* *** End Inner Wrapper *** */}
-        </DialogContent>
-      </Dialog>
+      <FullscreenDialog
+        isOpen={isDialogOpen}
+        onClose={closeDialog}
+        selectedPost={selectedPost}
+        favorites={favorites}
+        onToggleFavorite={toggleFavorite}
+        onShare={handleShare}
+        onDownload={handleDownload}
+      />
 
       {/* Keyboard Shortcuts Dialog */}
-      <Dialog open={showKeyboardShortcuts} onOpenChange={setShowKeyboardShortcuts}>
-        <DialogContent className="max-w-md">
-          <DialogTitle className="flex items-center gap-2">
-            <Keyboard className="h-5 w-5" />
-            Keyboard Shortcuts
-          </DialogTitle>
-          <DialogDescription>
-            Use these shortcuts to navigate faster
-          </DialogDescription>
-          <div className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <h4 className="font-medium text-sm text-muted-foreground">Fullscreen View</h4>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="flex items-center gap-2">
-                  <kbd className="px-2 py-1 text-xs font-mono bg-muted rounded">←</kbd>
-                  <span className="text-sm">Previous image</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <kbd className="px-2 py-1 text-xs font-mono bg-muted rounded">→</kbd>
-                  <span className="text-sm">Next image</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <kbd className="px-2 py-1 text-xs font-mono bg-muted rounded">Esc</kbd>
-                  <span className="text-sm">Close fullscreen</span>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <h4 className="font-medium text-sm text-muted-foreground">Search</h4>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="flex items-center gap-2">
-                  <kbd className="px-2 py-1 text-xs font-mono bg-muted rounded">Enter</kbd>
-                  <span className="text-sm">Fetch posts</span>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <h4 className="font-medium text-sm text-muted-foreground">Mobile Gestures</h4>
-              <div className="space-y-1 text-sm text-muted-foreground">
-                <p>• Swipe left/right to navigate images</p>
-                <p>• Swipe up to close fullscreen</p>
-              </div>
-            </div>
-          </div>
-          <div className="flex justify-end mt-4">
-            <Button variant="outline" size="sm" onClick={() => setShowKeyboardShortcuts(false)}>
-              Got it
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <KeyboardShortcutsDialog
+        isOpen={showKeyboardShortcuts}
+        onClose={() => setShowKeyboardShortcuts(false)}
+      />
 
       {/* Settings Modal */}
       <SettingsModal
