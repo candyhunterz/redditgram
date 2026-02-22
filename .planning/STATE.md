@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** Fast, responsive browsing and saving of Reddit media content with offline-capable favorites and feed presets.
-**Current focus:** Phase 3 - Extract Custom Hooks
+**Current focus:** Phase 4 - Extract Components
 
 ## Current Position
 
-Phase: 3 of 5 (Extract Custom Hooks)
-Plan: 4 of 4 in current phase (COMPLETE)
-Status: Phase complete
-Last activity: 2026-02-22 -- Completed Plan 03-04 (write tests for use-favorites, use-feed-presets, use-reddit-posts)
+Phase: 4 of 5 (Extract Components)
+Plan: 1 of 3 in current phase (COMPLETE)
+Status: In progress
+Last activity: 2026-02-22 -- Completed Plan 04-01 (extract MediaCarousel, FullscreenDialog, KeyboardShortcutsDialog from page.tsx)
 
-Progress: [========..] 68%
+Progress: [=========.] 74%
 
 ## Performance Metrics
 
@@ -30,9 +30,10 @@ Progress: [========..] 68%
 | 01-quick-wins | 2/2 | 10 min | 5 min |
 | 02-performance-bug-fixes | 2/3 | 3 min | 1.5 min |
 | 03-extract-custom-hooks | 4/4 | 9 min | 2.25 min |
+| 04-extract-components | 1/3 | 8 min | 8 min |
 
 **Recent Trend:**
-- Last 5 plans: 2 min, 2 min, 1 min, 4 min, 2 min
+- Last 5 plans: 2 min, 1 min, 4 min, 2 min, 8 min
 - Trend: -
 
 *Updated after each plan completion*
@@ -44,6 +45,7 @@ Progress: [========..] 68%
 | Phase 03-extract-custom-hooks P02 | 1 | 2 tasks | 4 files |
 | Phase 03-extract-custom-hooks P03 | 4 | 2 tasks | 2 files |
 | Phase 03-extract-custom-hooks P04 | 2 | 2 tasks | 3 files |
+| Phase 04-extract-components P01 | 8 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -75,6 +77,9 @@ Recent decisions affecting current work:
 - Plan 03-03: addToHistory passed as option argument (not closure) — hook does not close over page-level state
 - Plan 03-03: basePosts useMemo stays in page.tsx — orchestrates posts+favorites across two hooks, not extractable without coupling them
 - [Phase 03-04]: IntersectionObserver mocked at global scope in test file (not jest.setup.ts) — keeps the mock scoped to the test that needs it
+- [Phase 04-01]: MediaCarousel exported as named export matching the convention established during hook extraction
+- [Phase 04-01]: FullscreenDialog accepts favorites as Record<string, any> to avoid coupling to FavoritePostInfo type
+- [Phase 04-01]: Component extraction pattern: 'use client' + named exports + co-located interface
 
 ### Pending Todos
 
@@ -87,5 +92,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 03-04-PLAN.md (write tests for use-favorites, use-feed-presets, use-reddit-posts — Phase 3 complete)
+Stopped at: Completed 04-01-PLAN.md (extract MediaCarousel, FullscreenDialog, KeyboardShortcutsDialog from page.tsx)
 Resume file: None
