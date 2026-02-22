@@ -1,25 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { kv } from '@vercel/kv';
+import type { RedditPost, SortType, TimeFrame } from '@/services/reddit';
 
 // ========================================================================
-// 1. TYPE DEFINITIONS & HELPER FUNCTION (No changes)
+// 1. HELPER FUNCTION
 // ========================================================================
-export interface RedditPost {
-    title: string;
-    mediaUrls: string[]; // Thumbnail/preview URLs for grid view
-    fullQualityUrls: string[]; // Full quality URLs for fullscreen view
-    subreddit: string;
-    postId: string;
-    isUnplayableVideoFormat?: boolean;
-    // Metadata fields
-    ups?: number; // Upvotes
-    numComments?: number; // Number of comments
-    createdUtc?: number; // Unix timestamp
-    isNsfw?: boolean; // NSFW/adult content flag
-}
-export type SortType = 'hot' | 'top';
-export type TimeFrame = 'day' | 'week' | 'month' | 'year' | 'all';
 const extractMediaUrls = (postDetail: any): string[] => {
     if (!postDetail) return [];
     const urls: string[] = [];

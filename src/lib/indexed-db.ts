@@ -202,18 +202,6 @@ export async function clearOldCache(): Promise<void> {
   }
 }
 
-/**
- * Clear all cached posts
- */
-export async function clearAllPostsCache(): Promise<void> {
-  try {
-    const db = await getDB();
-    await db.clear('posts');
-  } catch (error) {
-    console.error('Error clearing all posts cache:', error);
-  }
-}
-
 // ========================================================================
 // FAVORITES
 // ========================================================================
@@ -244,36 +232,6 @@ export async function getAllFavorites(): Promise<Record<string, any>> {
   }
 }
 
-/**
- * Save all favorites
- */
-export async function saveAllFavorites(favorites: Record<string, any>): Promise<void> {
-  try {
-    const db = await getDB();
-    const tx = db.transaction('favorites', 'readwrite');
-
-    // Clear existing favorites
-    await tx.store.clear();
-
-    // Add all favorites
-    for (const [postId, favorite] of Object.entries(favorites)) {
-      await tx.store.put({
-        postId,
-        title: favorite.title,
-        subreddit: favorite.subreddit,
-        thumbnailUrl: favorite.thumbnailUrl,
-        mediaUrls: favorite.mediaUrls,
-        fullQualityUrls: favorite.fullQualityUrls,
-        timestamp: Date.now(),
-      });
-    }
-
-    await tx.done;
-  } catch (error) {
-    console.error('Error saving favorites:', error);
-  }
-}
-
 // ========================================================================
 // SAVED LISTS (Feed Presets)
 // ========================================================================
@@ -300,35 +258,6 @@ export async function getAllSavedLists(): Promise<FeedPreset[]> {
   } catch (error) {
     console.error('Error getting saved lists:', error);
     return [];
-  }
-}
-
-/**
- * Save all feed presets
- */
-export async function saveAllLists(presets: FeedPreset[]): Promise<void> {
-  try {
-    const db = await getDB();
-    const tx = db.transaction('savedLists', 'readwrite');
-
-    // Clear existing lists
-    await tx.store.clear();
-
-    // Add all presets
-    for (const preset of presets) {
-      await tx.store.put({
-        name: preset.name,
-        subreddits: preset.subreddits,
-        sortType: preset.sortType,
-        timeFrame: preset.timeFrame,
-        order: preset.order,
-        timestamp: preset.timestamp,
-      });
-    }
-
-    await tx.done;
-  } catch (error) {
-    console.error('Error saving lists:', error);
   }
 }
 
