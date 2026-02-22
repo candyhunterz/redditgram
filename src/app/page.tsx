@@ -3,37 +3,24 @@
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 // *** Standard Imports ***
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { X, Video, Copy as GalleryIcon, Filter, Loader2, ArrowUp, Heart, Sun, Moon, ArrowUpCircle, MessageCircle, Share2, Download, TrendingUp, HelpCircle, Keyboard, Search, Grid3X3, LayoutGrid, Grid2X2, Settings } from "lucide-react";
+import { Video, Copy as GalleryIcon, Loader2, ArrowUp, Sun, Moon, ArrowUpCircle, MessageCircle, Keyboard, Settings } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
-import { useSubredditHistory, POPULAR_SUBREDDITS } from "@/hooks/use-subreddit-history";
+import { useSubredditHistory } from "@/hooks/use-subreddit-history";
 import { formatRelativeTime, formatNumber } from "@/lib/format-time";
 import { sharePost } from "@/lib/share";
 import { downloadMedia } from "@/lib/download";
 import { usePostSearch } from "@/hooks/use-post-search";
-import { useGridDensity, DENSITY_CONFIG } from "@/hooks/use-grid-density";
+import { useGridDensity } from "@/hooks/use-grid-density";
 import { useSettings } from "@/hooks/use-settings";
 import { SettingsModal } from "@/components/settings-modal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { FullscreenDialog, KeyboardShortcutsDialog } from '@/components/fullscreen-dialog';
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { SubredditSearchBar } from '@/components/subreddit-search-bar';
+import { FeedControls } from '@/components/feed-controls';
 import Masonry from 'react-masonry-css';
 import { MediaCarousel } from '@/components/media-carousel';
 import { FeedPreset } from '@/lib/indexed-db';
@@ -56,9 +43,6 @@ export default function Home() {
   const [subredditInput, setSubredditInput] = useState<string>('');
   const [sortType, setSortType] = useState<SortType>('hot');
   const [timeFrame, setTimeFrame] = useState<TimeFrame>('day');
-  const [isControlsOpen, setIsControlsOpen] = useState(false);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
@@ -163,7 +147,6 @@ export default function Home() {
     setSortType(preset.sortType as SortType);
     setTimeFrame(preset.timeFrame as TimeFrame);
     setShowFavoritesOnly(false);
-    setShowSuggestions(false);
     fetchInitialPosts(preset.subreddits);
   }, [handleLoadPreset, fetchInitialPosts, setShowFavoritesOnly]);
 
@@ -220,7 +203,6 @@ export default function Home() {
   // -----------------------------------------------------------------------
   const triggerFetch = useCallback((inputOverride?: string) => {
     setShowFavoritesOnly(false);
-    setShowSuggestions(false);
     fetchInitialPosts(inputOverride);
   }, [fetchInitialPosts, setShowFavoritesOnly]);
 
@@ -273,89 +255,15 @@ export default function Home() {
                 )}
               </Button>
             </div>
-            {/* Input and Fetch Button */}
-            <div className="flex flex-col sm:flex-row items-stretch gap-2">
-                 <div className="relative flex-grow">
-                   <Input
-                      type="text" aria-label="Enter subreddit names separated by commas"
-                      placeholder="Enter subreddits..." value={subredditInput}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setSubredditInput(value);
-                        // Get the last word being typed for suggestions
-                        const parts = value.split(',');
-                        const lastPart = parts[parts.length - 1].trim();
-                        if (lastPart.length >= 2) {
-                          const matches = getSuggestions(lastPart);
-                          setSuggestions(matches.slice(0, 5));
-                          setShowSuggestions(matches.length > 0);
-                        } else {
-                          setShowSuggestions(false);
-                        }
-                      }}
-                      onFocus={() => {
-                        const parts = subredditInput.split(',');
-                        const lastPart = parts[parts.length - 1].trim();
-                        if (lastPart.length >= 2) {
-                          const matches = getSuggestions(lastPart);
-                          setSuggestions(matches.slice(0, 5));
-                          setShowSuggestions(matches.length > 0);
-                        }
-                      }}
-                      onBlur={() => {
-                        // Delay hiding to allow click on suggestion
-                        setTimeout(() => setShowSuggestions(false), 150);
-                      }}
-                      className="flex-grow text-base w-full"
-                      onKeyDown={(e) => { if (e.key === 'Enter' && !isLoading) triggerFetch(); }}
-                   />
-                   {/* Suggestions Dropdown */}
-                   {showSuggestions && suggestions.length > 0 && (
-                     <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-popover border rounded-md shadow-lg">
-                       {suggestions.map((suggestion) => (
-                         <button
-                           key={suggestion}
-                           className="w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors first:rounded-t-md last:rounded-b-md"
-                           onMouseDown={(e) => {
-                             e.preventDefault();
-                             // Replace the last part with the suggestion
-                             const parts = subredditInput.split(',');
-                             parts[parts.length - 1] = ' ' + suggestion;
-                             setSubredditInput(parts.join(',').replace(/^,\s*/, '').trim());
-                             setShowSuggestions(false);
-                           }}
-                         >
-                           r/{suggestion}
-                         </button>
-                       ))}
-                     </div>
-                   )}
-                 </div>
-                 <Button onClick={() => triggerFetch()} disabled={isLoading} className="w-full sm:w-auto flex-shrink-0 active:scale-95 transition-transform">
-                     {isLoading && posts.length === 0 ? "Fetching..." : "Fetch"}
-                 </Button>
-             </div>
-             {/* Popular Subreddits */}
-             <div className="flex flex-wrap justify-center gap-1.5">
-               <span className="flex items-center text-xs text-muted-foreground mr-1">
-                 <TrendingUp className="h-3 w-3 mr-1" />
-                 Popular:
-               </span>
-               {POPULAR_SUBREDDITS.slice(0, 6).map((sub) => (
-                 <Button
-                   key={sub}
-                   variant="ghost"
-                   size="sm"
-                   className="h-6 px-2 text-xs hover:bg-accent"
-                   onClick={() => {
-                     setSubredditInput(sub);
-                     setTimeout(() => triggerFetch(sub), 0);
-                   }}
-                 >
-                   r/{sub}
-                 </Button>
-               ))}
-             </div>
+            {/* Subreddit Search Bar */}
+            <SubredditSearchBar
+              subredditInput={subredditInput}
+              setSubredditInput={setSubredditInput}
+              isLoading={isLoading}
+              postsExist={posts.length > 0}
+              onFetch={triggerFetch}
+              getSuggestions={getSuggestions}
+            />
              {/* Feed Preset Bar - Always visible */}
              <div className="flex justify-center">
                <FeedPresetBar
@@ -369,93 +277,25 @@ export default function Home() {
                  disabled={isLoading}
                />
              </div>
-             {/* Collapsible Controls */}
-            <Collapsible open={isControlsOpen} onOpenChange={setIsControlsOpen}>
-                 <div className="flex justify-center mb-2">
-                     <CollapsibleTrigger asChild>
-                         <Button variant="ghost" size="sm" className="text-sm text-muted-foreground hover:text-foreground active:scale-95 transition-transform">
-                            <Filter className="h-4 w-4 mr-1" /> {isControlsOpen ? "Hide Options" : "Show Options"}
-                         </Button>
-                     </CollapsibleTrigger>
-                 </div>
-                <CollapsibleContent className="space-y-3 overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
-                    {/* Sort/Timeframe Controls */}
-                    <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-center justify-center pt-2">
-                        <RadioGroup defaultValue="hot" className="flex gap-4" value={sortType} onValueChange={(value) => { if(!isLoading) setSortType(value as SortType)}} aria-label="Sort posts by" >
-                            <Label htmlFor="sort-hot" className={cn("flex items-center space-x-2 p-1 rounded", isLoading ? "text-muted-foreground cursor-not-allowed" : "cursor-pointer hover:bg-accent")}> <RadioGroupItem value="hot" id="sort-hot" disabled={isLoading}/> <span>Hot</span> </Label>
-                            <Label htmlFor="sort-top" className={cn("flex items-center space-x-2 p-1 rounded", isLoading ? "text-muted-foreground cursor-not-allowed" : "cursor-pointer hover:bg-accent")}> <RadioGroupItem value="top" id="sort-top" disabled={isLoading}/> <span>Top</span> </Label>
-                        </RadioGroup>
-                        {sortType === 'top' && ( <Select value={timeFrame} onValueChange={(value) => {if(!isLoading) setTimeFrame(value as TimeFrame)}} disabled={isLoading} > <SelectTrigger className="w-[180px]" aria-label="Time frame"> <SelectValue placeholder="Time frame" /> </SelectTrigger> <SelectContent> <SelectItem value="day">Today</SelectItem> <SelectItem value="week">This Week</SelectItem> <SelectItem value="month">This Month</SelectItem> <SelectItem value="year">This Year</SelectItem> <SelectItem value="all">All Time</SelectItem> </SelectContent> </Select> )}
-                    </div>
-                    {/* Search Posts */}
-                    {postsToDisplay.length > 0 && (
-                      <div className="relative pt-2">
-                        <div className="flex items-center gap-2">
-                          <div className="relative flex-grow">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                              type="text"
-                              placeholder="Search loaded posts..."
-                              value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)}
-                              className="pl-9 text-sm"
-                            />
-                            {searchQuery && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6"
-                                onClick={clearSearch}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                        {searchQuery && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Found {postsToDisplay.length} matching posts
-                          </p>
-                        )}
-                      </div>
-                    )}
-                    {/* Grid Density and Favorites Toggles */}
-                    <div className="flex flex-wrap justify-center gap-2 pt-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-sm active:scale-95 transition-transform"
-                            onClick={cycleDensity}
-                            title={`Grid: ${densityConfig.label}`}
-                        >
-                            {density === 'compact' ? (
-                              <Grid3X3 className="h-4 w-4 mr-2" />
-                            ) : density === 'comfortable' ? (
-                              <LayoutGrid className="h-4 w-4 mr-2" />
-                            ) : (
-                              <Grid2X2 className="h-4 w-4 mr-2" />
-                            )}
-                            {densityConfig.label}
-                        </Button>
-                        <Button
-                            variant={showFavoritesOnly ? "default" : "outline"}
-                            size="sm"
-                            className={cn(
-                                "text-sm active:scale-95 transition-transform",
-                                showFavoritesOnly && "bg-pink-600 hover:bg-pink-700"
-                            )}
-                            onClick={() => setShowFavoritesOnly(prev => !prev)}
-                            disabled={isLoading || Object.keys(favorites).length === 0}
-                        >
-                            <Heart className={cn(
-                                "h-4 w-4 mr-2",
-                                showFavoritesOnly && "fill-current"
-                            )} />
-                            {showFavoritesOnly ? "Showing" : "Show"} Favorites ({Object.keys(favorites).length})
-                        </Button>
-                    </div>
-                </CollapsibleContent>
-            </Collapsible>
+             {/* Feed Controls */}
+            <FeedControls
+              sortType={sortType}
+              setSortType={setSortType}
+              timeFrame={timeFrame}
+              setTimeFrame={setTimeFrame}
+              isLoading={isLoading}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              clearSearch={clearSearch}
+              filteredPostCount={postsToDisplay.length}
+              showSearch={postsToDisplay.length > 0}
+              density={density}
+              cycleDensity={cycleDensity}
+              densityLabel={densityConfig.label}
+              showFavoritesOnly={showFavoritesOnly}
+              setShowFavoritesOnly={setShowFavoritesOnly}
+              favoritesCount={Object.keys(favorites).length}
+            />
          </div>
          {/* Error Message - Improved */}
          {error && (
