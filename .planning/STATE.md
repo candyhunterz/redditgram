@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 ## Current Position
 
 Phase: 4 of 5 (Extract Components)
-Plan: 1 of 3 in current phase (COMPLETE)
+Plan: 2 of 3 in current phase (COMPLETE)
 Status: In progress
-Last activity: 2026-02-22 -- Completed Plan 04-01 (extract MediaCarousel, FullscreenDialog, KeyboardShortcutsDialog from page.tsx)
+Last activity: 2026-02-22 -- Completed Plan 04-02 (extract SubredditSearchBar, FeedControls, PostCard from page.tsx)
 
-Progress: [=========.] 74%
+Progress: [=========.] 81%
 
 ## Performance Metrics
 
@@ -30,7 +30,7 @@ Progress: [=========.] 74%
 | 01-quick-wins | 2/2 | 10 min | 5 min |
 | 02-performance-bug-fixes | 2/3 | 3 min | 1.5 min |
 | 03-extract-custom-hooks | 4/4 | 9 min | 2.25 min |
-| 04-extract-components | 1/3 | 8 min | 8 min |
+| 04-extract-components | 2/3 | 12 min | 6 min |
 
 **Recent Trend:**
 - Last 5 plans: 2 min, 1 min, 4 min, 2 min, 8 min
@@ -46,6 +46,7 @@ Progress: [=========.] 74%
 | Phase 03-extract-custom-hooks P03 | 4 | 2 tasks | 2 files |
 | Phase 03-extract-custom-hooks P04 | 2 | 2 tasks | 3 files |
 | Phase 04-extract-components P01 | 8 | 2 tasks | 3 files |
+| Phase 04-extract-components P02 | 4 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,9 @@ Recent decisions affecting current work:
 - [Phase 04-01]: MediaCarousel exported as named export matching the convention established during hook extraction
 - [Phase 04-01]: FullscreenDialog accepts favorites as Record<string, any> to avoid coupling to FavoritePostInfo type
 - [Phase 04-01]: Component extraction pattern: 'use client' + named exports + co-located interface
+- [Phase 04-02]: SubredditSearchBar owns suggestions and showSuggestions state — removes two state vars from page.tsx
+- [Phase 04-02]: FeedControls owns isControlsOpen state — removes one state var from page.tsx
+- [Phase 04-02]: PostCard uses React.forwardRef so IntersectionObserver lastPostRef can be forwarded from page.tsx
 
 ### Pending Todos
 
@@ -92,5 +96,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 04-01-PLAN.md (extract MediaCarousel, FullscreenDialog, KeyboardShortcutsDialog from page.tsx)
+Stopped at: Completed 04-02-PLAN.md (extract SubredditSearchBar, FeedControls, PostCard from page.tsx)
 Resume file: None
