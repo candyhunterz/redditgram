@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 ## Current Position
 
 Phase: 3 of 5 (Extract Custom Hooks)
-Plan: 1 of 4 in current phase
+Plan: 2 of 4 in current phase
 Status: In progress
-Last activity: 2026-02-22 -- Completed Plan 03-01 (shared types + granular IDB operations)
+Last activity: 2026-02-22 -- Completed Plan 03-02 (extract 4 custom hooks)
 
-Progress: [=====.....] 45%
+Progress: [======....] 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: 2.6 min
-- Total execution time: 0.24 hours
+- Total plans completed: 6
+- Average duration: 2.2 min
+- Total execution time: 0.25 hours
 
 **By Phase:**
 
@@ -29,10 +29,10 @@ Progress: [=====.....] 45%
 |-------|-------|-------|----------|
 | 01-quick-wins | 2/2 | 10 min | 5 min |
 | 02-performance-bug-fixes | 2/3 | 3 min | 1.5 min |
-| 03-extract-custom-hooks | 1/4 | 2 min | 2 min |
+| 03-extract-custom-hooks | 2/4 | 3 min | 1.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 2 min, 8 min, 1 min, 2 min, 2 min
+- Last 5 plans: 8 min, 1 min, 2 min, 2 min, 1 min
 - Trend: -
 
 *Updated after each plan completion*
@@ -41,6 +41,7 @@ Progress: [=====.....] 45%
 | Phase 02-performance-bug-fixes P01 | 1 | 2 tasks | 2 files |
 | Phase 02-performance-bug-fixes P02 | 2 | 2 tasks | 1 files |
 | Phase 03-extract-custom-hooks P01 | 2 | 2 tasks | 3 files |
+| Phase 03-extract-custom-hooks P02 | 1 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -65,6 +66,9 @@ Recent decisions affecting current work:
 - Plan 03-01: export type required for re-exports because isolatedModules is enabled in tsconfig
 - Plan 03-01: Mocked idb openDB with in-memory stores object instead of fake-indexeddb (not installed) -- jest.mock pattern gives full control over put/get/delete/transaction behavior
 - Plan 03-01: renamePreset uses db.transaction readwrite to atomically read, put new, delete old in one transaction
+- Plan 03-02: toggleFavorite uses functional setFavorites with fire-and-forget IDB side effect — no bulk saveAllFavorites
+- Plan 03-02: handleSavePreset/handleUpdatePreset accept params as arguments (not closures) for testability
+- Plan 03-02: handleLoadPreset returns preset and only sets activePresetName — fetch trigger stays in page.tsx
 
 ### Pending Todos
 
@@ -77,5 +81,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 03-01-PLAN.md (shared types + granular IDB operations)
+Stopped at: Completed 03-02-PLAN.md (extract 4 custom hooks)
 Resume file: None
