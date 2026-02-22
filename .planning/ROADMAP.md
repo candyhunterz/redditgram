@@ -93,10 +93,12 @@ Plans:
   5. Unused destructured values cleaned up in page.tsx
   6. RedditPost type duplication resolved (route.ts imports from types/reddit.ts)
 **Gap Closure:** Closes 7 requirement gaps + tech debt from audit
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 04-01: TBD
+- [ ] 04-01-PLAN.md -- Extract MediaCarousel and FullscreenDialog components from page.tsx
+- [ ] 04-02-PLAN.md -- Extract SubredditSearchBar, FeedControls, and PostCard components from page.tsx
+- [ ] 04-03-PLAN.md -- Extract PostGrid, slim page.tsx to orchestrator, clean tech debt (dead exports, type duplication)
 
 **Risk/Dependencies**: Medium -- component boundaries must be drawn correctly. Prop drilling must be clean (no prop explosion). Depends on Phase 3 hooks being stable and well-interfaced.
 
