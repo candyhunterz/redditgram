@@ -12,7 +12,7 @@ This refactor takes a working but bloated Redditgram PWA and systematically clea
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Quick Wins** - Remove dead code, fix low-hanging bugs, add cache headers
+- [x] **Phase 1: Quick Wins** - Remove dead code, fix low-hanging bugs, add cache headers (completed 2026-02-22)
 - [ ] **Phase 2: Performance Bug Fixes** - Fix scroll/memo perf bugs, add LRU cache with tests
 - [ ] **Phase 3: Extract Custom Hooks** - Extract business logic into 5 hooks with shared types and granular DB ops
 - [ ] **Phase 4: Extract Components** - Extract 6 UI components, slim page.tsx to orchestrator
@@ -158,7 +158,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Quick Wins | 0/2 | Planned | - |
+| 1. Quick Wins | 2/2 | Complete   | 2026-02-22 |
 | 2. Performance Bug Fixes | 0/? | Not started | - |
 | 3. Extract Custom Hooks | 0/? | Not started | - |
 | 4. Extract Components | 0/? | Not started | - |

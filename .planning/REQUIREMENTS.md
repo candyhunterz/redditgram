@@ -13,17 +13,17 @@
 
 ## CLEAN: Dead Code Removal
 
-### REQ-CLEAN-01: Delete unused UI components
+### REQ-CLEAN-01: Delete unused UI components [COMPLETE - 01-01]
 Delete 21 unused shadcn/ui components from `src/components/ui/`: accordion, alert-dialog, alert, avatar, badge, calendar, chart, checkbox, form, menubar, popover, progress, scroll-area, separator, sheet, sidebar, slider, switch, table, tabs, textarea, tooltip.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §1.2
 - **Acceptance**: Files deleted, no import errors, build passes
 
-### REQ-CLEAN-02: Delete unused AI directory
+### REQ-CLEAN-02: Delete unused AI directory [COMPLETE - 01-01]
 Delete `src/ai/ai-instance.ts` and `src/ai/dev.ts`.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §1.3
 - **Acceptance**: Directory removed, no import errors
 
-### REQ-CLEAN-03: Remove unused npm dependencies
+### REQ-CLEAN-03: Remove unused npm dependencies [COMPLETE - 01-01]
 Remove 26 dependencies and 1 devDependency from `package.json`: `@genkit-ai/googleai`, `@genkit-ai/next`, `@hookform/resolvers`, `@radix-ui/react-accordion`, `@radix-ui/react-alert-dialog`, `@radix-ui/react-avatar`, `@radix-ui/react-checkbox`, `@radix-ui/react-menubar`, `@radix-ui/react-popover`, `@radix-ui/react-progress`, `@radix-ui/react-scroll-area`, `@radix-ui/react-separator`, `@radix-ui/react-slider`, `@radix-ui/react-switch`, `@radix-ui/react-tabs`, `@radix-ui/react-tooltip`, `@tanstack-query-firebase/react`, `@tanstack/react-query`, `@tanstack/react-virtual`, `date-fns`, `firebase`, `genkit`, `react-day-picker`, `react-hook-form`, `recharts`, `zod`. DevDep: `genkit-cli`. Scripts: `genkit:dev`, `genkit:watch`.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §1.4
 - **Acceptance**: `npm install` succeeds, `npm run build` passes, bundle size reduced
