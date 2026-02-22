@@ -19,6 +19,7 @@ import { usePostSearch } from "@/hooks/use-post-search";
 import { useGridDensity, DENSITY_CONFIG } from "@/hooks/use-grid-density";
 import { useSettings } from "@/hooks/use-settings";
 import { SettingsModal } from "@/components/settings-modal";
+import { LRUCache } from "@/lib/lru-cache";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -472,7 +473,7 @@ export default function Home() {
   const showScrollTopRef = useRef(false);
 
   // --- Cache ---
-  const apiCache = useRef(new Map<CacheKey, CachedRedditResponse>()).current;
+  const apiCache = useRef(new LRUCache<CacheKey, CachedRedditResponse>(100)).current;
   const generateCacheKey = ( sub: string, sort: SortType, time?: TimeFrame, after?: string | null ): CacheKey => {
       const timeKey = sort === 'top' ? (time || 'all') : 'hot';
       const afterKey = after || 'initial';
