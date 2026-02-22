@@ -95,7 +95,7 @@ Create `src/types/reddit.ts` with types and pure helpers moved from page.tsx: `C
 - **Source**: PERFORMANCE_REFACTOR_PLAN §3.1
 - **Acceptance**: Types importable from `@/types/reddit`, page.tsx imports from new location
 
-### REQ-ARCH-02: Extract use-reddit-posts hook
+### REQ-ARCH-02: Extract use-reddit-posts hook [COMPLETE - 03-03]
 Create `src/hooks/use-reddit-posts.ts` encapsulating: posts, isLoading, afterTokens, hasMore, fetchInitiated, error, sortType, timeFrame, LRU cache, performFetch, fetchInitialPosts, loadMorePosts, lastPostRef (IntersectionObserver), usePrefetch integration.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §3.3
 - **Acceptance**: Hook returns documented interface, page.tsx consumes hook instead of inline state

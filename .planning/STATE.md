@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 ## Current Position
 
 Phase: 3 of 5 (Extract Custom Hooks)
-Plan: 2 of 4 in current phase
+Plan: 3 of 4 in current phase
 Status: In progress
-Last activity: 2026-02-22 -- Completed Plan 03-02 (extract 4 custom hooks)
+Last activity: 2026-02-22 -- Completed Plan 03-03 (extract useRedditPosts + rewire page.tsx)
 
-Progress: [======....] 50%
+Progress: [=======...] 62%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
-- Average duration: 2.2 min
-- Total execution time: 0.25 hours
+- Total plans completed: 7
+- Average duration: 2.4 min
+- Total execution time: 0.28 hours
 
 **By Phase:**
 
@@ -29,10 +29,10 @@ Progress: [======....] 50%
 |-------|-------|-------|----------|
 | 01-quick-wins | 2/2 | 10 min | 5 min |
 | 02-performance-bug-fixes | 2/3 | 3 min | 1.5 min |
-| 03-extract-custom-hooks | 2/4 | 3 min | 1.5 min |
+| 03-extract-custom-hooks | 3/4 | 7 min | 2.3 min |
 
 **Recent Trend:**
-- Last 5 plans: 8 min, 1 min, 2 min, 2 min, 1 min
+- Last 5 plans: 1 min, 2 min, 2 min, 1 min, 4 min
 - Trend: -
 
 *Updated after each plan completion*
@@ -42,6 +42,7 @@ Progress: [======....] 50%
 | Phase 02-performance-bug-fixes P02 | 2 | 2 tasks | 1 files |
 | Phase 03-extract-custom-hooks P01 | 2 | 2 tasks | 3 files |
 | Phase 03-extract-custom-hooks P02 | 1 | 2 tasks | 4 files |
+| Phase 03-extract-custom-hooks P03 | 4 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -69,6 +70,9 @@ Recent decisions affecting current work:
 - Plan 03-02: toggleFavorite uses functional setFavorites with fire-and-forget IDB side effect — no bulk saveAllFavorites
 - Plan 03-02: handleSavePreset/handleUpdatePreset accept params as arguments (not closures) for testability
 - Plan 03-02: handleLoadPreset returns preset and only sets activePresetName — fetch trigger stays in page.tsx
+- Plan 03-03: fetchInitialPosts does not reset showFavoritesOnly/showSuggestions — page.tsx triggerFetch wrapper owns those resets so hook stays pure
+- Plan 03-03: addToHistory passed as option argument (not closure) — hook does not close over page-level state
+- Plan 03-03: basePosts useMemo stays in page.tsx — orchestrates posts+favorites across two hooks, not extractable without coupling them
 
 ### Pending Todos
 
@@ -81,5 +85,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 03-02-PLAN.md (extract 4 custom hooks)
+Stopped at: Completed 03-03-PLAN.md (extract useRedditPosts + rewire page.tsx)
 Resume file: None

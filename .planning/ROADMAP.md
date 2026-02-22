@@ -72,9 +72,9 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 03-01-PLAN.md -- Create shared types file and TDD granular IndexedDB operations
-- [ ] 03-02-PLAN.md -- Extract use-scroll-to-top, use-fullscreen-dialog, use-favorites, use-feed-presets hooks
-- [ ] 03-03-PLAN.md -- Extract use-reddit-posts hook and rewire page.tsx to consume all 5 hooks
+- [x] 03-01-PLAN.md -- Create shared types file and TDD granular IndexedDB operations
+- [x] 03-02-PLAN.md -- Extract use-scroll-to-top, use-fullscreen-dialog, use-favorites, use-feed-presets hooks
+- [x] 03-03-PLAN.md -- Extract use-reddit-posts hook and rewire page.tsx to consume all 5 hooks
 - [ ] 03-04-PLAN.md -- Write tests for use-favorites, use-feed-presets, and use-reddit-posts hooks
 
 **Risk/Dependencies**: Medium -- this is the largest refactor phase. State coordination between hooks must be preserved exactly. The hooks must expose the same interface that page.tsx currently uses inline. Depends on Phase 2 LRU cache being available.
@@ -164,6 +164,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 |-------|----------------|--------|-----------|
 | 1. Quick Wins | 2/2 | Complete   | 2026-02-22 |
 | 2. Performance Bug Fixes | 2/3 | In progress | - |
-| 3. Extract Custom Hooks | 2/4 | In Progress|  |
+| 3. Extract Custom Hooks | 3/4 | In Progress|  |
 | 4. Extract Components | 0/? | Not started | - |
 | 5. next/image Integration | 0/? | Not started | - |
