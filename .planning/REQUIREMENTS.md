@@ -100,22 +100,22 @@ Create `src/hooks/use-reddit-posts.ts` encapsulating: posts, isLoading, afterTok
 - **Source**: PERFORMANCE_REFACTOR_PLAN §3.3
 - **Acceptance**: Hook returns documented interface, page.tsx consumes hook instead of inline state
 
-### REQ-ARCH-03: Extract use-favorites hook
+### REQ-ARCH-03: Extract use-favorites hook [COMPLETE - 03-02]
 Create `src/hooks/use-favorites.ts` encapsulating: favorites, showFavoritesOnly, favoritesLoadComplete. Uses granular putFavorite/deleteFavorite.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §3.4
 - **Acceptance**: Hook returns documented interface, favorites persist correctly
 
-### REQ-ARCH-04: Extract use-feed-presets hook
+### REQ-ARCH-04: Extract use-feed-presets hook [COMPLETE - 03-02]
 Create `src/hooks/use-feed-presets.ts` encapsulating: presets, activePresetName, initialLoadComplete. Uses granular putPreset/deletePreset/renamePreset.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §3.5
 - **Acceptance**: Hook returns documented interface, presets persist correctly
 
-### REQ-ARCH-05: Extract use-scroll-to-top hook
+### REQ-ARCH-05: Extract use-scroll-to-top hook [COMPLETE - 03-02]
 Create `src/hooks/use-scroll-to-top.ts` encapsulating: showScrollTop state + ref-based scroll listener + scrollToTop function (~20 lines).
 - **Source**: PERFORMANCE_REFACTOR_PLAN §3.6
 - **Acceptance**: Scroll-to-top button works identically
 
-### REQ-ARCH-06: Extract use-fullscreen-dialog hook
+### REQ-ARCH-06: Extract use-fullscreen-dialog hook [COMPLETE - 03-02]
 Create `src/hooks/use-fullscreen-dialog.ts` encapsulating: selectedPost, isDialogOpen, openDialog, closeDialog (~20 lines).
 - **Source**: PERFORMANCE_REFACTOR_PLAN §3.7
 - **Acceptance**: Fullscreen dialog opens/closes identically
@@ -183,7 +183,7 @@ Test putFavorite, deleteFavorite, putPreset, deletePreset, renamePreset.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §3.2
 - **Acceptance**: Tests pass, cover single-record CRUD
 
-### REQ-TEST-03: Extracted hook tests
+### REQ-TEST-03: Extracted hook tests [COMPLETE - 03-04]
 Tests for use-reddit-posts, use-favorites, use-feed-presets core logic.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §3.3-3.5
 - **Acceptance**: Tests pass, cover key state transitions

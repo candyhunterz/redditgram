@@ -13,7 +13,7 @@ This refactor takes a working but bloated Redditgram PWA and systematically clea
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Quick Wins** - Remove dead code, fix low-hanging bugs, add cache headers (completed 2026-02-22)
-- [ ] **Phase 2: Performance Bug Fixes** - Fix scroll/memo perf bugs, add LRU cache with tests
+- [x] **Phase 2: Performance Bug Fixes** - Fix scroll/memo perf bugs, add LRU cache with tests (completed 2026-02-22)
 - [x] **Phase 3: Extract Custom Hooks** - Extract business logic into 5 hooks with shared types and granular DB ops (completed 2026-02-22)
 - [ ] **Phase 4: Extract Components** - Extract 6 UI components, slim page.tsx to orchestrator
 - [ ] **Phase 5: next/image Integration** - Replace raw img tags with next/image for automatic optimization
@@ -75,20 +75,24 @@ Plans:
 - [x] 03-01-PLAN.md -- Create shared types file and TDD granular IndexedDB operations
 - [x] 03-02-PLAN.md -- Extract use-scroll-to-top, use-fullscreen-dialog, use-favorites, use-feed-presets hooks
 - [x] 03-03-PLAN.md -- Extract use-reddit-posts hook and rewire page.tsx to consume all 5 hooks
-- [ ] 03-04-PLAN.md -- Write tests for use-favorites, use-feed-presets, and use-reddit-posts hooks
+- [x] 03-04-PLAN.md -- Write tests for use-favorites, use-feed-presets, and use-reddit-posts hooks
 
 **Risk/Dependencies**: Medium -- this is the largest refactor phase. State coordination between hooks must be preserved exactly. The hooks must expose the same interface that page.tsx currently uses inline. Depends on Phase 2 LRU cache being available.
 
 ---
 
 ### Phase 4: Extract Components
-**Goal**: Extract UI components from page.tsx, reducing it to a ~150-line orchestrator that wires hooks to components
+**Goal**: Extract UI components from page.tsx, reducing it to a ~150-line orchestrator that wires hooks to components, and clean up tech debt from prior phases
 **Depends on**: Phase 3 (hooks exist for components to consume)
 **Requirements**: REQ-ARCH-07, REQ-ARCH-08, REQ-ARCH-09, REQ-ARCH-10, REQ-ARCH-11, REQ-ARCH-12, REQ-ARCH-13
 **Success Criteria** (what must be TRUE):
   1. Six new component files exist: MediaCarousel, PostCard, PostGrid, SubredditSearchBar, FeedControls, FullscreenDialog
   2. page.tsx is 200 lines or fewer and contains only hook calls, local UI state, event handler wiring, and JSX composition
   3. Full manual test passes: fetch, infinite scroll, fullscreen viewer, favorites, presets, sort/filter, search, grid density, theme, settings, keyboard shortcuts, mobile swipe, download, share
+  4. Dead exports removed from indexed-db.ts (saveAllFavorites, saveAllLists, clearAllPostsCache)
+  5. Unused destructured values cleaned up in page.tsx
+  6. RedditPost type duplication resolved (route.ts imports from types/reddit.ts)
+**Gap Closure:** Closes 7 requirement gaps + tech debt from audit
 **Plans**: TBD
 
 Plans:
@@ -163,7 +167,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Quick Wins | 2/2 | Complete   | 2026-02-22 |
-| 2. Performance Bug Fixes | 2/3 | In progress | - |
+| 2. Performance Bug Fixes | 2/2 | Complete   | 2026-02-22 |
 | 3. Extract Custom Hooks | 4/4 | Complete   | 2026-02-22 |
 | 4. Extract Components | 0/? | Not started | - |
 | 5. next/image Integration | 0/? | Not started | - |
