@@ -1,9 +1,11 @@
 /**
  * Progressive Image Component
- * Shows a blurred placeholder while the full image loads
+ * Uses next/image for automatic WebP conversion, responsive sizing, and lazy loading.
+ * Shows a blur placeholder while the full image loads.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
 interface ProgressiveImageProps {
@@ -15,29 +17,11 @@ interface ProgressiveImageProps {
   onError?: () => void;
 }
 
-const getThumbnailSrc = (url: string): string => {
-  try {
-    const parsed = new URL(url);
-    const hostname = parsed.hostname;
-
-    if (hostname === 'i.redd.it') {
-      // i.redd.it supports the 'm' suffix convention (e.g., abc.jpg -> abcm.jpg)
-      return url.replace(/\.(jpg|jpeg|png|gif|webp)$/i, 'm.$1');
-    }
-
-    if (hostname === 'preview.redd.it' || hostname === 'external-preview.redd.it') {
-      // preview.redd.it uses width query param; reduce to 108 for blur placeholder
-      parsed.searchParams.set('width', '108');
-      return parsed.toString();
-    }
-
-    // Unknown host: return original (no blur placeholder, graceful fallback)
-    return url;
-  } catch {
-    // Invalid URL: return original
-    return url;
-  }
-};
+// Neutral gray SVG used as blur placeholder while image loads.
+// Zero network requests; next/image applies CSS blur automatically.
+const blurDataURL = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><rect width="8" height="8" fill="%23888"/></svg>'
+)}`;
 
 export const ProgressiveImage: React.FC<ProgressiveImageProps> = ({
   src,
@@ -47,23 +31,9 @@ export const ProgressiveImage: React.FC<ProgressiveImageProps> = ({
   onLoad,
   onError,
 }) => {
-  const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const imgRef = useRef<HTMLImageElement>(null);
-
-  // Create a tiny thumbnail URL from Reddit's CDN
-  // Handles i.redd.it (m suffix), preview.redd.it and external-preview.redd.it (width param)
-  const thumbnailSrc = getThumbnailSrc(src);
-
-  useEffect(() => {
-    // If image is already cached, it will load immediately
-    if (imgRef.current?.complete) {
-      setImageLoaded(true);
-    }
-  }, []);
 
   const handleLoad = () => {
-    setImageLoaded(true);
     onLoad?.();
   };
 
@@ -82,39 +52,18 @@ export const ProgressiveImage: React.FC<ProgressiveImageProps> = ({
 
   return (
     <div className="relative w-full h-full overflow-hidden">
-      {/* Blurred placeholder - shows until main image loads */}
-      {!imageLoaded && (
-        <img
-          src={thumbnailSrc}
-          alt={alt}
-          className={cn(
-            'absolute inset-0 w-full h-full object-cover blur-xl scale-110 transition-opacity duration-300',
-            imageLoaded ? 'opacity-0' : 'opacity-100',
-            className
-          )}
-          aria-hidden="true"
-        />
-      )}
-
-      {/* Main image */}
-      <img
-        ref={imgRef}
+      <Image
         src={src}
         alt={alt}
+        fill
+        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         loading={loading}
-        className={cn(
-          'w-full h-full object-cover transition-opacity duration-300',
-          imageLoaded ? 'opacity-100' : 'opacity-0',
-          className
-        )}
+        placeholder="blur"
+        blurDataURL={blurDataURL}
+        className={cn('object-cover', className)}
         onLoad={handleLoad}
         onError={handleError}
       />
-
-      {/* Loading shimmer effect */}
-      {!imageLoaded && (
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
-      )}
     </div>
   );
 };
