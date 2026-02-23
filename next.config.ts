@@ -8,6 +8,15 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'i.redd.it' },
+      { protocol: 'https', hostname: 'preview.redd.it' },
+      { protocol: 'https', hostname: 'external-preview.redd.it' },
+      { protocol: 'https', hostname: 'i.imgur.com' },
+      { protocol: 'https', hostname: 'v.redd.it' },
+    ],
+  },
 };
 
 export default nextConfig;
