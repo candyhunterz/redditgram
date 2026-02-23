@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Performance Bug Fixes** - Fix scroll/memo perf bugs, add LRU cache with tests (completed 2026-02-22)
 - [x] **Phase 3: Extract Custom Hooks** - Extract business logic into 5 hooks with shared types and granular DB ops (completed 2026-02-22)
 - [x] **Phase 4: Extract Components** - Extract 6 UI components, slim page.tsx to orchestrator (completed 2026-02-22)
-- [ ] **Phase 5: next/image Integration** - Replace raw img tags with next/image for automatic optimization
+- [x] **Phase 5: next/image Integration** - Replace raw img tags with next/image for automatic optimization (completed 2026-02-22)
 
 ## Phase Details
 
@@ -96,9 +96,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 04-01-PLAN.md -- Extract MediaCarousel and FullscreenDialog components from page.tsx
-- [ ] 04-02-PLAN.md -- Extract SubredditSearchBar, FeedControls, and PostCard components from page.tsx
-- [ ] 04-03-PLAN.md -- Extract PostGrid, slim page.tsx to orchestrator, clean tech debt (dead exports, type duplication)
+- [x] 04-01-PLAN.md -- Extract MediaCarousel and FullscreenDialog components from page.tsx
+- [x] 04-02-PLAN.md -- Extract SubredditSearchBar, FeedControls, and PostCard components from page.tsx
+- [x] 04-03-PLAN.md -- Extract PostGrid, slim page.tsx to orchestrator, clean tech debt (dead exports, type duplication)
 
 **Risk/Dependencies**: Medium -- component boundaries must be drawn correctly. Prop drilling must be clean (no prop explosion). Depends on Phase 3 hooks being stable and well-interfaced.
 
@@ -115,7 +115,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 05-01-PLAN.md -- Configure remotePatterns for Reddit CDN domains and rewrite ProgressiveImage to use next/image
+- [x] 05-01-PLAN.md -- Configure remotePatterns for Reddit CDN domains and rewrite ProgressiveImage to use next/image
 
 **Risk/Dependencies**: Low-medium -- next/image with external domains needs careful remotePatterns configuration. Reddit CDN URL patterns vary across hosts. Video elements remain as-is (next/image does not handle video).
 
@@ -172,4 +172,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 2. Performance Bug Fixes | 2/2 | Complete   | 2026-02-22 |
 | 3. Extract Custom Hooks | 4/4 | Complete   | 2026-02-22 |
 | 4. Extract Components | 3/3 | Complete   | 2026-02-22 |
-| 5. next/image Integration | 0/1 | Not started | - |
+| 5. next/image Integration | 1/1 | Complete   | 2026-02-22 |

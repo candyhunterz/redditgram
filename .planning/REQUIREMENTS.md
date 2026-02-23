@@ -159,12 +159,12 @@ Page becomes pure orchestrator: hooks at top, ~6 local state vars, event handler
 
 ## IMAGE: next/image Integration
 
-### REQ-IMAGE-01: Configure remotePatterns
+### REQ-IMAGE-01: Configure remotePatterns [COMPLETE - 05-01]
 In `next.config.ts`: add `images.remotePatterns` for `i.redd.it`, `preview.redd.it`, `external-preview.redd.it`, `i.imgur.com`, `v.redd.it`.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §5.1
 - **Acceptance**: next/image can load from all Reddit CDN domains
 
-### REQ-IMAGE-02: Update ProgressiveImage to use next/image
+### REQ-IMAGE-02: Update ProgressiveImage to use next/image [COMPLETE - 05-01]
 Replace `<img>` with `<Image>` using `fill` layout + `sizes` prop. Add tiny SVG blurDataURL placeholder. Keep ProgressiveVideo unchanged.
 - **Source**: PERFORMANCE_REFACTOR_PLAN §5.2
 - **Acceptance**: Images load as WebP at appropriate sizes, lazy loading works, fullscreen loads full quality

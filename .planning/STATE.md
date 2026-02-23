@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** Fast, responsive browsing and saving of Reddit media content with offline-capable favorites and feed presets.
-**Current focus:** Phase 4 - Extract Components
+**Current focus:** Phase 5 - next/image Integration
 
 ## Current Position
 
-Phase: 4 of 5 (Extract Components)
-Plan: 3 of 3 in current phase (COMPLETE)
+Phase: 5 of 5 (next/image Integration)
+Plan: 1 of 1 in current phase (COMPLETE)
 Status: Phase complete
-Last activity: 2026-02-22 -- Completed Plan 04-03 (extract PostGrid, slim page.tsx to 191 lines, clean tech debt)
+Last activity: 2026-02-22 -- Completed Plan 05-01 (next/image integration: remotePatterns + ProgressiveImage rewrite)
 
-Progress: [==========] 90%
+Progress: [==========] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
-- Average duration: 2.3 min
-- Total execution time: 0.30 hours
+- Total plans completed: 9
+- Average duration: 2.2 min
+- Total execution time: 0.32 hours
 
 **By Phase:**
 
@@ -31,9 +31,10 @@ Progress: [==========] 90%
 | 02-performance-bug-fixes | 2/3 | 3 min | 1.5 min |
 | 03-extract-custom-hooks | 4/4 | 9 min | 2.25 min |
 | 04-extract-components | 2/3 | 12 min | 6 min |
+| 05-nextimage-integration | 1/1 | 2 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 2 min, 1 min, 4 min, 2 min, 8 min
+- Last 5 plans: 1 min, 4 min, 2 min, 8 min, 2 min
 - Trend: -
 
 *Updated after each plan completion*
@@ -48,6 +49,7 @@ Progress: [==========] 90%
 | Phase 04-extract-components P01 | 8 | 2 tasks | 3 files |
 | Phase 04-extract-components P02 | 4 | 2 tasks | 4 files |
 | Phase 04-extract-components P03 | 4 | 2 tasks | 4 files |
+| Phase 05-nextimage-integration P01 | 2 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -88,6 +90,10 @@ Recent decisions affecting current work:
 - [Phase 04-03]: Error block moved from page.tsx header into PostGrid — error display is content-related, not header-related
 - [Phase 04-03]: PostGrid receives rawPostCount separately from posts (filtered) to correctly distinguish initial load skeleton from no-results state
 - [Phase 04-03]: route.ts imports RedditPost/SortType/TimeFrame from @/services/reddit — type import erased at compile time, no runtime cross-boundary issue
+- [Phase 05-01]: Keep loading prop (lazy|eager) instead of switching to priority -- next/image supports loading natively so MediaCarousel needs zero changes
+- [Phase 05-01]: Use inline SVG blurDataURL (neutral gray 8x8 rect) instead of getThumbnailSrc thumbnail -- zero network requests, simpler code
+- [Phase 05-01]: Remove getThumbnailSrc entirely -- only used for blur placeholder img which is now replaced by blurDataURL
+- [Phase 05-01]: next/image fill prop with sizes=(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw matching masonry grid breakpoints
 
 ### Pending Todos
 
@@ -100,5 +106,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 04-03-PLAN.md (extract PostGrid, slim page.tsx to 191 lines, clean tech debt)
+Stopped at: Completed 05-01-PLAN.md (next/image integration: remotePatterns + ProgressiveImage rewrite)
 Resume file: None
