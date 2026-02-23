@@ -112,10 +112,10 @@ Plans:
   1. next/image can load from all Reddit CDN domains (i.redd.it, preview.redd.it, external-preview.redd.it, i.imgur.com, v.redd.it)
   2. Images load as WebP at appropriate responsive sizes (network tab shows optimized requests, not full-resolution originals)
   3. Images below the fold are lazy-loaded; fullscreen viewer loads full-quality images
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 05-01: TBD
+- [ ] 05-01-PLAN.md -- Configure remotePatterns for Reddit CDN domains and rewrite ProgressiveImage to use next/image
 
 **Risk/Dependencies**: Low-medium -- next/image with external domains needs careful remotePatterns configuration. Reddit CDN URL patterns vary across hosts. Video elements remain as-is (next/image does not handle video).
 
@@ -172,4 +172,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 2. Performance Bug Fixes | 2/2 | Complete   | 2026-02-22 |
 | 3. Extract Custom Hooks | 4/4 | Complete   | 2026-02-22 |
 | 4. Extract Components | 3/3 | Complete   | 2026-02-22 |
-| 5. next/image Integration | 0/? | Not started | - |
+| 5. next/image Integration | 0/1 | Not started | - |
