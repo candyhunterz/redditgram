@@ -51,20 +51,20 @@ export const ProgressiveImage: React.FC<ProgressiveImageProps> = ({
   }
 
   return (
-    <div className="relative w-full h-full overflow-hidden">
-      <Image
-        src={src}
-        alt={alt}
-        fill
-        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-        loading={loading}
-        placeholder="blur"
-        blurDataURL={blurDataURL}
-        className={cn('object-cover', className)}
-        onLoad={handleLoad}
-        onError={handleError}
-      />
-    </div>
+    <Image
+      src={src}
+      alt={alt}
+      width={0}
+      height={0}
+      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+      loading={loading}
+      placeholder="blur"
+      blurDataURL={blurDataURL}
+      className={cn('object-cover', className)}
+      style={{ width: '100%', height: 'auto' }}
+      onLoad={handleLoad}
+      onError={handleError}
+    />
   );
 };
 
