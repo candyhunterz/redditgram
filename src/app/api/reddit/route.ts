@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { kv } from '@vercel/kv';
 import type { RedditPost, SortType, TimeFrame } from '@/services/reddit';
 
 // ========================================================================
@@ -138,11 +137,13 @@ const extractFullQualityUrls = (postDetail: any): string[] => {
 };
 
 // ========================================================================
-// 2. OAUTH TOKEN HANDLER (No changes)
+// 2. OAUTH TOKEN HANDLER
 // ========================================================================
+let cachedToken: string | null = null;
+let tokenExpiresAt = 0;
+
 async function getAccessToken(): Promise<string> {
-    const cachedToken = await kv.get<string>('reddit_access_token');
-    if (cachedToken) {
+    if (cachedToken && Date.now() < tokenExpiresAt) {
         return cachedToken;
     }
 
@@ -171,12 +172,10 @@ async function getAccessToken(): Promise<string> {
     }
 
     const data = await response.json();
-    const token = data.access_token;
-    const expiresIn = data.expires_in;
+    cachedToken = data.access_token;
+    tokenExpiresAt = Date.now() + (data.expires_in - 60) * 1000;
 
-    await kv.set('reddit_access_token', token, { ex: expiresIn - 60 });
-
-    return token;
+    return cachedToken!;
 }
 
 // ========================================================================
