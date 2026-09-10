@@ -336,6 +336,7 @@ export async function deletePreset(name: string): Promise<void> {
  * If oldName does not exist, does nothing.
  */
 export async function renamePreset(oldName: string, newName: string): Promise<void> {
+  if (oldName === newName) return;
   try {
     const db = await getDB();
     const tx = db.transaction('savedLists', 'readwrite');

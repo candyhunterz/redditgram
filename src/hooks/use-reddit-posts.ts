@@ -48,6 +48,16 @@ export function useRedditPosts({
   const loadMorePostsRef = useRef<() => Promise<void>>();
 
   const observer = useRef<IntersectionObserver>();
+  const generation = useRef(0);
+  const pending = useRef(false);
+  const controller = useRef<AbortController | null>(null);
+  const activeFeed = useRef<{ subreddits: string[]; sortType: SortType; timeFrame: TimeFrame } | null>(null);
+
+  useEffect(() => () => {
+    generation.current++;
+    controller.current?.abort();
+    observer.current?.disconnect();
+  }, []);
 
   // -----------------------------------------------------------------------
   // performFetch — internal fetch helper (not exposed)
@@ -57,6 +67,8 @@ export function useRedditPosts({
     currentSortType: SortType,
     currentTimeFrame: TimeFrame | undefined,
     currentAfterTokens: { [subreddit: string]: string | null },
+    signal: AbortSignal,
+    refresh = false,
   ): Promise<{
     groupedPosts: RedditPost[][];
     updatedAfterTokens: { [subreddit: string]: string | null };
@@ -85,7 +97,7 @@ export function useRedditPosts({
       subOrderForResults.push(sub);
 
       // Check in-memory cache first (fastest)
-      if (apiCache.has(cacheKey)) {
+      if (!refresh && apiCache.has(cacheKey)) {
         const cachedData = apiCache.get(cacheKey)!;
         const postsWithMetadata = cachedData.posts.map(p => ({
           ...p,
@@ -97,7 +109,8 @@ export function useRedditPosts({
         // Check IndexedDB cache then fall back to network
         fetchPromises.push(
           (async () => {
-            const idbCached = await getCachedPosts(cacheKey);
+            const idbCached = refresh ? null : await getCachedPosts(cacheKey);
+            signal.throwIfAborted();
             if (idbCached) {
               apiCache.set(cacheKey, { posts: idbCached.posts, after: idbCached.after });
               const postsWithMetadata = idbCached.posts.map(p => ({
@@ -113,8 +126,11 @@ export function useRedditPosts({
               timeFrame: currentSortType === 'top' ? currentTimeFrame : undefined,
               after: afterParam,
               limit: POSTS_PER_LOAD,
+              signal,
+              refresh,
             });
 
+            signal.throwIfAborted();
             const dataToCache: CachedRedditResponse = { posts: response.posts, after: response.after };
             apiCache.set(cacheKey, dataToCache);
             await setCachedPosts(cacheKey, response.posts, response.after, {
@@ -136,6 +152,7 @@ export function useRedditPosts({
 
     try {
       const results: PromiseSettledResult<SuccessfulFetchValue>[] = await Promise.allSettled(fetchPromises);
+      signal.throwIfAborted();
       const successfulResults: SuccessfulFetchValue[] = [];
       const updatedAfterTokens: { [subreddit: string]: string | null } = {};
 
@@ -175,9 +192,21 @@ export function useRedditPosts({
   // -----------------------------------------------------------------------
   // fetchInitialPosts — clears posts and fetches fresh results
   // -----------------------------------------------------------------------
-  const fetchInitialPosts = useCallback(async (inputOverride?: string) => {
+  const fetchInitialPosts = useCallback(async (
+    inputOverride?: string,
+    filters?: { sortType: SortType; timeFrame: TimeFrame },
+  ) => {
+    const requestId = ++generation.current;
+    controller.current?.abort();
+    const requestController = new AbortController();
+    controller.current = requestController;
+    pending.current = true;
+    const selectedSort = filters?.sortType ?? sortType;
+    const selectedTime = filters?.timeFrame ?? timeFrame;
     const inputToUse = inputOverride ?? subredditInput;
     const subsToUse = parseSubreddits(inputToUse);
+
+    activeFeed.current = { subreddits: subsToUse, sortType: selectedSort, timeFrame: selectedTime };
 
     // Save searched subreddits to history
     subsToUse.forEach(sub => {
@@ -191,16 +220,13 @@ export function useRedditPosts({
       setPosts([]);
       setFetchInitiated(false);
       setHasMore(false);
+      setIsLoading(false);
+      pending.current = false;
       return;
     }
 
-    // Bust in-memory cache for the initial page of each subreddit
-    subsToUse.forEach(sub => {
-      const initialCacheKey = generateCacheKey(sub, sortType, sortType === 'top' ? timeFrame : undefined, undefined);
-      if (apiCache.has(initialCacheKey)) {
-        apiCache.delete(initialCacheKey);
-      }
-    });
+    // A submitted feed is a refresh. Discard old pagination pages as well.
+    apiCache.clear();
 
     setIsLoading(true);
     setError(null);
@@ -210,7 +236,8 @@ export function useRedditPosts({
     setFetchInitiated(true);
 
     try {
-      const { groupedPosts, updatedAfterTokens, anyHasMore } = await performFetch(subsToUse, sortType, timeFrame, {});
+      const { groupedPosts, updatedAfterTokens, anyHasMore } = await performFetch(subsToUse, selectedSort, selectedTime, {}, requestController.signal, true);
+      if (requestId !== generation.current) return;
       const interleavedInitialPosts = interleavePosts(groupedPosts);
       setPosts(interleavedInitialPosts);
       setAfterTokens(updatedAfterTokens);
@@ -224,6 +251,7 @@ export function useRedditPosts({
         }
       }
     } catch (e) {
+      if (requestId !== generation.current) return;
       if (e instanceof Error) {
         setError(`Fetch error: ${e.message}`);
       } else {
@@ -232,7 +260,10 @@ export function useRedditPosts({
       setHasMore(false);
       setPosts([]);
     } finally {
-      setIsLoading(false);
+      if (requestId === generation.current) {
+        pending.current = false;
+        setIsLoading(false);
+      }
     }
   }, [subredditInput, sortType, timeFrame, toast, performFetch, apiCache, addToHistory]);
 
@@ -240,8 +271,10 @@ export function useRedditPosts({
   // loadMorePosts — appends the next page to posts
   // -----------------------------------------------------------------------
   const loadMorePosts = useCallback(async () => {
-    if (isLoading || !hasMore || !fetchInitiated) return;
-    const subsToUse = parseSubreddits(subredditInput);
+    if (pending.current || !hasMore || !fetchInitiated || showFavoritesOnly) return;
+    const feed = activeFeed.current;
+    if (!feed) return;
+    const subsToUse = feed.subreddits;
     if (subsToUse.length === 0) {
       setHasMore(false);
       return;
@@ -254,20 +287,34 @@ export function useRedditPosts({
       return;
     }
 
+    const requestId = generation.current;
+    const requestController = controller.current;
+    if (!requestController || requestController.signal.aborted) return;
+    pending.current = true;
     setIsLoading(true);
     setError(null);
     try {
       const { groupedPosts, updatedAfterTokens, anyHasMore } = await performFetch(
         subsWithPotentialMore,
-        sortType,
-        timeFrame,
+        feed.sortType,
+        feed.timeFrame,
         afterTokens,
+        requestController.signal,
       );
+      if (requestId !== generation.current) return;
       const interleavedNewPosts = interleavePosts(groupedPosts);
-      setPosts(prevPosts => [...prevPosts, ...interleavedNewPosts]);
+      setPosts(prevPosts => {
+        const seen = new Set(prevPosts.map(post => post.postId));
+        return [...prevPosts, ...interleavedNewPosts.filter(post => {
+          if (seen.has(post.postId)) return false;
+          seen.add(post.postId);
+          return true;
+        })];
+      });
       setAfterTokens(updatedAfterTokens);
       setHasMore(anyHasMore);
     } catch (e) {
+      if (requestId !== generation.current) return;
       if (e instanceof Error) {
         setError(`Load more error: ${e.message}`);
       } else {
@@ -275,9 +322,12 @@ export function useRedditPosts({
       }
       setHasMore(false);
     } finally {
-      setIsLoading(false);
+      if (requestId === generation.current) {
+        pending.current = false;
+        setIsLoading(false);
+      }
     }
-  }, [isLoading, hasMore, fetchInitiated, afterTokens, subredditInput, sortType, timeFrame, performFetch]);
+  }, [hasMore, fetchInitiated, afterTokens, showFavoritesOnly, performFetch]);
 
   // Keep the ref current so IntersectionObserver always calls the latest version.
   useEffect(() => {
@@ -289,8 +339,8 @@ export function useRedditPosts({
   // -----------------------------------------------------------------------
   const lastPostRef = useCallback(
     (node: HTMLDivElement | null) => {
-      if (isLoading || showFavoritesOnly) return;
-      if (observer.current) observer.current.disconnect();
+      observer.current?.disconnect();
+      if (isLoading || showFavoritesOnly || !node) return;
       observer.current = new IntersectionObserver(
         entries => {
           if (entries[0]?.isIntersecting && hasMore && fetchInitiated) {

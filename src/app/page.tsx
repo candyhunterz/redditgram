@@ -1,14 +1,13 @@
 "use client";
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { ArrowUp, Sun, Moon, Keyboard, Settings } from "lucide-react";
-import { useTheme } from "@/hooks/use-theme";
 import { useSubredditHistory } from "@/hooks/use-subreddit-history";
 import { sharePost } from "@/lib/share";
 import { downloadMedia } from "@/lib/download";
 import { usePostSearch } from "@/hooks/use-post-search";
-import { useGridDensity } from "@/hooks/use-grid-density";
+import { DENSITY_CONFIG, GridDensity } from "@/hooks/use-grid-density";
 import { useSettings } from "@/hooks/use-settings";
 import { SettingsModal } from "@/components/settings-modal";
 import { useToast } from "@/hooks/use-toast";
@@ -33,15 +32,17 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
 
   const { toast } = useToast();
-  const { theme, toggleTheme } = useTheme();
   const { addToHistory, getSuggestions } = useSubredditHistory();
   const { settings, updateSetting, resetSettings, resolvedTheme } = useSettings();
-  const { density, setDensity, cycleDensity, config: densityConfig, gridStyle } = useGridDensity();
-
-  // Sync settings.gridDensity with useGridDensity hook
-  useEffect(() => {
-    if (settings.gridDensity !== density) setDensity(settings.gridDensity);
-  }, [settings.gridDensity, density, setDensity]);
+  const theme = resolvedTheme;
+  const toggleTheme = () => updateSetting('theme', theme === 'dark' ? 'light' : 'dark');
+  const density = settings.gridDensity;
+  const densityConfig = DENSITY_CONFIG[density];
+  const gridStyle = useMemo(() => ({ gap: `${densityConfig.gap}px` }), [densityConfig.gap]);
+  const cycleDensity = () => {
+    const order: GridDensity[] = ['compact', 'comfortable', 'spacious'];
+    updateSetting('gridDensity', order[(order.indexOf(density) + 1) % order.length]);
+  };
 
   const { showScrollTop, scrollToTop } = useScrollToTop();
   const { selectedPost, isDialogOpen, openDialog, closeDialog } = useFullscreenDialog();
@@ -74,7 +75,7 @@ export default function Home() {
     setSortType(preset.sortType as SortType);
     setTimeFrame(preset.timeFrame as TimeFrame);
     setShowFavoritesOnly(false);
-    fetchInitialPosts(preset.subreddits);
+    fetchInitialPosts(preset.subreddits, { sortType: preset.sortType as SortType, timeFrame: preset.timeFrame as TimeFrame });
   }, [handleLoadPreset, fetchInitialPosts, setShowFavoritesOnly]);
 
   const onSavePreset = useCallback(() =>
@@ -95,8 +96,7 @@ export default function Home() {
     }
   }, [toast]);
 
-  const handleDownload = useCallback(async (post: RedditPost) => {
-    const urlToDownload = post.fullQualityUrls?.[0] || post.mediaUrls?.[0];
+  const handleDownload = useCallback(async (post: RedditPost, urlToDownload: string) => {
     if (!urlToDownload) { toast({ variant: 'destructive', description: 'No media to download' }); return; }
     toast({ description: 'Starting download...' });
     const success = await downloadMedia({ url: urlToDownload, subreddit: post.subreddit, postId: post.postId });
@@ -138,7 +138,7 @@ export default function Home() {
           <SubredditSearchBar
             subredditInput={subredditInput} setSubredditInput={setSubredditInput}
             isLoading={isLoading} postsExist={posts.length > 0}
-            onFetch={triggerFetch} getSuggestions={getSuggestions}
+            onFetch={triggerFetch} getSuggestions={getSuggestions} keyboardShortcutsEnabled={settings.keyboardShortcutsEnabled}
           />
           <div className="flex justify-center">
             <FeedPresetBar
@@ -151,7 +151,7 @@ export default function Home() {
             sortType={sortType} setSortType={setSortType} timeFrame={timeFrame} setTimeFrame={setTimeFrame}
             isLoading={isLoading} searchQuery={searchQuery} setSearchQuery={setSearchQuery}
             clearSearch={clearSearch} filteredPostCount={postsToDisplay.length}
-            showSearch={postsToDisplay.length > 0} density={density} cycleDensity={cycleDensity}
+            showSearch={basePosts.length > 0 || searchQuery.length > 0} density={density} cycleDensity={cycleDensity}
             densityLabel={densityConfig.label} showFavoritesOnly={showFavoritesOnly}
             setShowFavoritesOnly={setShowFavoritesOnly} favoritesCount={Object.keys(favorites).length}
           />
@@ -162,6 +162,7 @@ export default function Home() {
         posts={postsToDisplay} isLoading={isLoading} hasMore={hasMore}
         fetchInitiated={fetchInitiated} showFavoritesOnly={showFavoritesOnly} error={error}
         favorites={favorites} breakpointColumnsObj={breakpointColumnsObj} gridStyle={gridStyle}
+        showMetadata={settings.showMetadata}
         densityGap={densityConfig.gap} lastPostRef={lastPostRef}
         onToggleFavorite={toggleFavorite} onOpenDialog={openDialog}
         onRetry={() => triggerFetch()} rawPostCount={posts.length}
@@ -176,7 +177,8 @@ export default function Home() {
       )}
 
       <FullscreenDialog isOpen={isDialogOpen} onClose={closeDialog} selectedPost={selectedPost}
-        favorites={favorites} onToggleFavorite={toggleFavorite} onShare={handleShare} onDownload={handleDownload} />
+        favorites={favorites} onToggleFavorite={toggleFavorite} onShare={handleShare} onDownload={handleDownload}
+        autoplayVideos={settings.autoplayVideos} keyboardShortcutsEnabled={settings.keyboardShortcutsEnabled} />
 
       <KeyboardShortcutsDialog isOpen={showKeyboardShortcuts} onClose={() => setShowKeyboardShortcuts(false)} />
 

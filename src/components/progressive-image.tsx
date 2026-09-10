@@ -17,6 +17,16 @@ interface ProgressiveImageProps {
   onError?: () => void;
 }
 
+const optimizedHosts = new Set(['i.redd.it', 'preview.redd.it', 'external-preview.redd.it', 'i.imgur.com', 'v.redd.it']);
+function canOptimize(src: string): boolean {
+  try {
+    const url = new URL(src);
+    return url.protocol === 'https:' && optimizedHosts.has(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 // Neutral gray SVG used as blur placeholder while image loads.
 // Zero network requests; next/image applies CSS blur automatically.
 const blurDataURL = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
@@ -53,6 +63,7 @@ export const ProgressiveImage: React.FC<ProgressiveImageProps> = ({
   return (
     <Image
       src={src}
+      unoptimized={!canOptimize(src)}
       alt={alt}
       width={0}
       height={0}
@@ -115,7 +126,7 @@ export const ProgressiveVideo: React.FC<ProgressiveVideoProps> = ({
     <div className="relative w-full h-full">
       {/* Loading indicator */}
       {!videoLoaded && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10 pointer-events-none">
           <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin" />
         </div>
       )}
@@ -130,6 +141,7 @@ export const ProgressiveVideo: React.FC<ProgressiveVideoProps> = ({
         loop={loop}
         preload={preload}
         poster={poster}
+        onLoadedMetadata={handleLoadedData}
         onLoadedData={handleLoadedData}
         onError={handleError}
       />

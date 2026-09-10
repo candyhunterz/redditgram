@@ -28,9 +28,11 @@ export async function getPosts(
         timeFrame?: TimeFrame;
         after?: string;
         limit?: number;
+        signal?: AbortSignal;
+        refresh?: boolean;
     }
 ): Promise<{ posts: RedditPost[], after: string | null }> {
-    const { timeFrame, after, limit = 20 } = options;
+    const { timeFrame, after, limit = 20, signal, refresh } = options;
 
     if (sortType === 'top' && !timeFrame) {
         throw new Error("TimeFrame ('day', 'week', 'month', 'year', 'all') is required when using sortType 'top'.");
@@ -50,11 +52,13 @@ export async function getPosts(
         params.append('after', after);
     }
 
+    if (refresh) params.set('refresh', '1');
+
     const url = `/api/reddit?${params.toString()}`;
 
     try {
         // Fetch from our own backend. No User-Agent or CORS issues here!
-        const response = await fetch(url);
+        const response = await fetch(url, { signal, cache: refresh ? 'no-store' : 'default' });
 
         if (!response.ok) {
             const errorData = await response.json();
@@ -65,6 +69,7 @@ export async function getPosts(
         return data;
 
     } catch (error: any) {
+        if (signal?.aborted) throw error;
         console.error(`Error fetching from API route /api/reddit:`, error);
         // Re-throw the error so the component's error handling can catch it
         throw new Error(`Failed to fetch posts: ${error.message}`);

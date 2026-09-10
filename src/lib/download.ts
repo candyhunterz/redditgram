@@ -1,3 +1,5 @@
+import { mediaExtension } from './media'
+
 /**
  * Generate a filename for downloaded media
  */
@@ -10,14 +12,9 @@ export function generateFilename(subreddit: string, postId: string, url: string)
  * Extract file extension from URL
  */
 function getExtensionFromUrl(url: string): string {
-  const validExtensions = ['jpg', 'jpeg', 'png', 'gif', 'mp4']
-  const lowerUrl = url.toLowerCase()
-
-  for (const ext of validExtensions) {
-    if (lowerUrl.endsWith(`.${ext}`)) {
-      return ext
-    }
-  }
+  const validExtensions = ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'webp']
+  const extension = mediaExtension(url)
+  if (validExtensions.includes(extension)) return extension
 
   return 'jpg' // Default to jpg
 }

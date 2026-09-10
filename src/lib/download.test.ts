@@ -47,7 +47,7 @@ describe('download utilities', () => {
 
     it('should default to jpg for unknown extensions', () => {
       expect(generateFilename('test', 'abc', 'https://example.com/image')).toBe('reddit_test_abc.jpg')
-      expect(generateFilename('test', 'abc', 'https://example.com/image.webp')).toBe('reddit_test_abc.jpg')
+      expect(generateFilename('test', 'abc', 'https://example.com/image.unknown')).toBe('reddit_test_abc.jpg')
     })
   })
 

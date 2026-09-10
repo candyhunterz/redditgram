@@ -79,6 +79,7 @@ import {
   putPreset,
   deletePreset,
   renamePreset,
+  getAllSavedLists,
 } from '@/lib/indexed-db';
 
 import { FeedPreset } from '@/lib/indexed-db';
@@ -200,4 +201,12 @@ describe('renamePreset', () => {
     await putPreset(preset);
     await expect(renamePreset('Preserve Fields', 'Renamed')).resolves.toBeUndefined();
   });
+});
+
+
+it('preserves a persisted preset when the new name is unchanged', async () => {
+  const preset = makePreset({ name: 'Same Name' });
+  await putPreset(preset);
+  await renamePreset('Same Name', 'Same Name');
+  expect(await getAllSavedLists()).toContainEqual(preset);
 });

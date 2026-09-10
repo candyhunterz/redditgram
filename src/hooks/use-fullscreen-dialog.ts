@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import type { RedditPost } from '@/types/reddit';
 
 /**
@@ -11,14 +11,19 @@ export function useFullscreenDialog() {
   const [selectedPost, setSelectedPost] = useState<RedditPost | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
+  const closeTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(closeTimer.current), []);
+
   const openDialog = useCallback((post: RedditPost) => {
+    clearTimeout(closeTimer.current);
     setSelectedPost(post);
     setIsDialogOpen(true);
   }, []);
 
   const closeDialog = useCallback(() => {
     setIsDialogOpen(false);
-    setTimeout(() => { setSelectedPost(null); }, 300);
+    clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => { setSelectedPost(null); }, 300);
   }, []);
 
   return { selectedPost, isDialogOpen, openDialog, closeDialog };

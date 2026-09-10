@@ -44,7 +44,7 @@ export const isValidSubreddit = (subreddit: string): boolean => {
  * non-empty subreddit names.
  */
 export const parseSubreddits = (input: string): string[] => {
-  return input.split(',').map(s => s.trim()).filter(s => s !== '');
+  return [...new Set(input.split(',').map(s => s.trim().toLowerCase()).filter(Boolean))];
 };
 
 /**

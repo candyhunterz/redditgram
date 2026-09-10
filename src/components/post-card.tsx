@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback } from 'react';
+import { isVideoUrl } from '@/lib/media';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Video, Copy as GalleryIcon, ArrowUpCircle, MessageCircle } from 'lucide-react';
@@ -11,18 +12,21 @@ import type { RedditPost } from '@/types/reddit';
 interface PostCardProps {
   post: RedditPost;
   isFavorite: boolean;
-  onToggleFavorite: () => void;
-  onClick: () => void;
+  onToggleFavorite: (post: RedditPost) => void;
+  onClick: (post: RedditPost) => void;
+  showMetadata: boolean;
   gap: number;
 }
 
-export const PostCard = React.forwardRef<HTMLDivElement, PostCardProps>(
-  function PostCard({ post, isFavorite, onToggleFavorite, onClick, gap }, ref) {
+export const PostCard = React.memo(React.forwardRef<HTMLDivElement, PostCardProps>(
+  function PostCard({ post, isFavorite, onToggleFavorite, onClick, gap, showMetadata }, ref) {
     const firstUrl = post?.mediaUrls?.[0];
-    const isVideoPost = firstUrl && firstUrl.endsWith('.mp4');
+    const isVideoPost = isVideoUrl(firstUrl);
     const isGalleryPost = post?.mediaUrls?.length > 1;
     const isUnplayable = post.isUnplayableVideoFormat ?? false;
     const mediaType = isVideoPost ? 'video' : isGalleryPost ? 'gallery' : 'image';
+
+    const toggleFavorite = useCallback(() => onToggleFavorite(post), [onToggleFavorite, post]);
 
     return (
       <div
@@ -31,11 +35,11 @@ export const PostCard = React.forwardRef<HTMLDivElement, PostCardProps>(
         role="listitem"
       >
         <Card
-          onClick={() => !isUnplayable && onClick()}
+          onClick={() => !isUnplayable && onClick(post)}
           onKeyDown={(e) => {
-            if (!isUnplayable && (e.key === 'Enter' || e.key === ' ')) {
+            if (e.target === e.currentTarget && !isUnplayable && (e.key === 'Enter' || e.key === ' ')) {
               e.preventDefault();
-              onClick();
+              onClick(post);
             }
           }}
           tabIndex={isUnplayable ? -1 : 0}
@@ -60,7 +64,7 @@ export const PostCard = React.forwardRef<HTMLDivElement, PostCardProps>(
             </div>
           )}
           {/* Metadata Overlay */}
-          <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/70 via-black/40 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          {showMetadata && <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/70 via-black/40 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
             <div className="flex items-center justify-between text-white text-xs">
               <div className="flex items-center gap-2">
                 <span className="flex items-center gap-0.5" title="Upvotes">
@@ -81,7 +85,7 @@ export const PostCard = React.forwardRef<HTMLDivElement, PostCardProps>(
                 </span>
               )}
             </div>
-          </div>
+          </div>}
           {/* Grid Item Media Carousel */}
           <MediaCarousel
             mediaUrls={post.mediaUrls}
@@ -90,13 +94,13 @@ export const PostCard = React.forwardRef<HTMLDivElement, PostCardProps>(
             subreddit={post.subreddit}
             postId={post.postId}
             isUnplayableVideoFormat={isUnplayable}
-            onToggleFavorite={onToggleFavorite}
+            onToggleFavorite={toggleFavorite}
             isFavorite={isFavorite}
           />
         </Card>
       </div>
     );
   }
-);
+));
 
 PostCard.displayName = 'PostCard';

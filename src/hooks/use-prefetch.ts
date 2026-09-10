@@ -3,7 +3,7 @@
  * Starts loading when user scrolls to 80% of current content
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface UsePrefetchOptions {
   onPrefetch: () => void;
@@ -49,10 +49,10 @@ export function usePrefetch({
   }, [enabled, threshold, onPrefetch, isPrefetching]);
 
   // Reset prefetch trigger when new content is loaded
-  const resetPrefetch = () => {
+  const resetPrefetch = useCallback(() => {
     prefetchTriggeredRef.current = false;
     setIsPrefetching(false);
-  };
+  }, []);
 
   return { isPrefetching, resetPrefetch };
 }

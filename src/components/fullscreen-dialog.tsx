@@ -15,7 +15,9 @@ interface FullscreenDialogProps {
   favorites: Record<string, any>;
   onToggleFavorite: (post: RedditPost) => void;
   onShare: (post: RedditPost) => void;
-  onDownload: (post: RedditPost) => void;
+  onDownload: (post: RedditPost, url: string) => void;
+  autoplayVideos?: boolean;
+  keyboardShortcutsEnabled?: boolean;
 }
 
 export function FullscreenDialog({
@@ -26,6 +28,8 @@ export function FullscreenDialog({
   onToggleFavorite,
   onShare,
   onDownload,
+  autoplayVideos = true,
+  keyboardShortcutsEnabled = true,
 }: FullscreenDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -52,7 +56,9 @@ export function FullscreenDialog({
                   isFavorite={!!favorites[selectedPost.postId]}
                   onClose={onClose}
                   onShare={() => onShare(selectedPost)}
-                  onDownload={() => onDownload(selectedPost)}
+                  onDownload={(url) => onDownload(selectedPost, url)}
+                  autoplayVideos={autoplayVideos}
+                  keyboardShortcutsEnabled={keyboardShortcutsEnabled}
                />
             ) : ( <div className="text-white text-xl">Loading content...</div> )}
 

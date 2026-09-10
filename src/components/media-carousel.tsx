@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { DialogClose } from '@/components/ui/dialog';
 import { ChevronLeft, ChevronRight, X, Video, Heart, Share2, Download } from 'lucide-react';
 import { ProgressiveImage, ProgressiveVideo } from '@/components/progressive-image';
+import { isVideoUrl } from '@/lib/media';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 // --- MediaCarousel Component (Updated with Top Control Bar) ---
@@ -21,12 +22,14 @@ export interface MediaCarouselProps {
   isFavorite?: boolean;
   onClose?: () => void;
   onShare?: () => void;
-  onDownload?: () => void;
+  onDownload?: (url: string) => void;
+  autoplayVideos?: boolean;
+  keyboardShortcutsEnabled?: boolean;
 }
 
 export const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
     mediaUrls, fullQualityUrls, title, subreddit, postId, isFullScreen = false, isUnplayableVideoFormat = false,
-    onToggleFavorite, isFavorite = false, onClose, onShare, onDownload
+    onToggleFavorite, isFavorite = false, onClose, onShare, onDownload, autoplayVideos = true, keyboardShortcutsEnabled = true
 }) => {
     // --- State and Refs ---
     const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
@@ -57,7 +60,7 @@ export const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
     }, [validMediaUrls.length]);
 
     const currentMediaUrl = validMediaUrls[currentMediaIndex];
-    const isVideo = currentMediaUrl?.endsWith('.mp4') && !isUnplayableVideoFormat;
+    const isVideo = isVideoUrl(currentMediaUrl) && !isUnplayableVideoFormat;
 
     // --- Swipe Handlers ---
     const handleTouchStart = (e: React.TouchEvent) => {
@@ -105,14 +108,14 @@ export const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
 
     // Keyboard navigation effect
     useEffect(() => {
-      if (!isFullScreen || !showButtons) return;
+      if (!isFullScreen || !showButtons || !keyboardShortcutsEnabled) return;
       const handleKeyDown = (event: KeyboardEvent) => {
           if (event.key === 'ArrowRight') { nextMedia(); }
           else if (event.key === 'ArrowLeft') { prevMedia(); }
       };
       window.addEventListener('keydown', handleKeyDown);
       return () => { window.removeEventListener('keydown', handleKeyDown); };
-    }, [isFullScreen, showButtons, nextMedia, prevMedia]);
+    }, [isFullScreen, showButtons, nextMedia, prevMedia, keyboardShortcutsEnabled]);
 
 
     // --- Render Logic ---
@@ -125,7 +128,7 @@ export const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
     if (isUnplayableVideoFormat && !isFullScreen) {
       return (
           <div className="relative w-full h-full flex flex-col items-center justify-center bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 p-2 text-center overflow-hidden">
-              {currentMediaUrl && ( <img src={currentMediaUrl} alt={title + " (Preview)"} className="absolute inset-0 w-full h-full object-cover opacity-10 dark:opacity-5 blur-[2px]" loading="lazy" /> )}
+              {currentMediaUrl && ( <ProgressiveImage src={currentMediaUrl} alt={title + " (Preview)"} className="absolute inset-0 w-full h-full object-cover opacity-10 dark:opacity-5 blur-[2px]" loading="lazy" /> )}
               <div className="relative z-10 flex flex-col items-center">
                    <Video className="w-6 h-6 mb-1 opacity-40" />
                    <p className="text-xs font-semibold leading-tight line-clamp-2" title={title}>
@@ -182,7 +185,7 @@ export const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
                             className="h-8 w-8 rounded-full text-white hover:bg-white/20 active:scale-90"
                             onClick={(e) => {
                                 e.stopPropagation();
-                                onDownload?.();
+                                if (currentMediaUrl) onDownload?.(currentMediaUrl);
                             }}
                             aria-label="Download media"
                         >
@@ -207,8 +210,8 @@ export const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
             {/* Navigation Arrows & Dots */}
             {showButtons && (
                 <>
-                 <button onClick={prevMedia} aria-label="Previous Media" className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full z-30 transition-opacity duration-300 opacity-0 group-hover:opacity-100 focus:opacity-100 active:scale-90"> <ChevronLeft size={24}/> </button>
-                 <button onClick={nextMedia} aria-label="Next Media" className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full z-30 transition-opacity duration-300 opacity-0 group-hover:opacity-100 focus:opacity-100 active:scale-90"> <ChevronRight size={24}/> </button>
+                 <button onClick={(e) => { e.stopPropagation(); prevMedia(); }} aria-label="Previous Media" className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full z-30 transition-opacity duration-300 opacity-0 group-hover:opacity-100 focus:opacity-100 active:scale-90"> <ChevronLeft size={24}/> </button>
+                 <button onClick={(e) => { e.stopPropagation(); nextMedia(); }} aria-label="Next Media" className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full z-30 transition-opacity duration-300 opacity-0 group-hover:opacity-100 focus:opacity-100 active:scale-90"> <ChevronRight size={24}/> </button>
                  <div className="absolute bottom-3 left-0 right-0 flex justify-center space-x-1.5 z-20 pointer-events-none">
                     {validMediaUrls.map((_, index) => ( <span key={index} className={cn( 'h-2 w-2 rounded-full transition-all duration-300', index === currentMediaIndex ? 'bg-white scale-110' : 'bg-gray-400 opacity-50 scale-90' )} /> ))}
                  </div>
@@ -219,7 +222,7 @@ export const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
             <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
                  {isUnplayableVideoFormat && isFullScreen ? (
                      <div className="relative w-full h-full flex flex-col items-center justify-center bg-gray-900 text-white p-4 text-center">
-                         {currentMediaUrl && ( <img src={currentMediaUrl} alt={title + " (Preview)"} className="max-w-full max-h-[70vh] object-contain mb-4"/> )}
+                         {currentMediaUrl && ( <ProgressiveImage src={currentMediaUrl} alt={title + " (Preview)"} className="max-w-full max-h-[70vh] object-contain mb-4"/> )}
                          <Video className="w-10 h-10 mb-2 opacity-60" />
                          <p className="text-base font-semibold mb-2">Video format not supported in this app.</p>
                          <a href={`https://www.reddit.com/r/${subreddit}/comments/${postId}`} target="_blank" rel="noopener noreferrer" className="text-base underline text-blue-400 hover:text-blue-300"> View Original Post on Reddit </a>
@@ -232,7 +235,7 @@ export const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
                       controls={isFullScreen}
                       muted={!isFullScreen}
                       playsInline
-                      autoPlay={isFullScreen}
+                      autoPlay={isFullScreen && autoplayVideos}
                       loop
                       preload={isFullScreen ? "auto" : "metadata"}
                     />
@@ -295,7 +298,7 @@ export const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
                          className="h-12 w-12 rounded-full text-white hover:bg-white/20 active:scale-90"
                          onClick={(e) => {
                            e.stopPropagation();
-                           onDownload?.();
+                           if (currentMediaUrl) onDownload?.(currentMediaUrl);
                          }}
                          aria-label="Download media"
                        >

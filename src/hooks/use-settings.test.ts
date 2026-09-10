@@ -200,3 +200,13 @@ describe('useSettings', () => {
     expect(result.current.resolvedTheme).toBe('light')
   })
 })
+
+
+it('migrates legacy theme and density preferences and applies the theme', () => {
+  localStorageMock.clear();
+  localStorageMock.setItem('theme', 'light');
+  localStorageMock.setItem('gridDensity', 'compact');
+  const { result } = renderHook(() => useSettings());
+  expect(result.current.settings).toMatchObject({ theme: 'light', gridDensity: 'compact' });
+  expect(document.documentElement).toHaveClass('light');
+});

@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom'
 
+if (typeof window !== 'undefined') {
 // Mock matchMedia for responsive tests
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
@@ -29,3 +30,5 @@ const indexedDBMock = {
   open: jest.fn(),
 }
 Object.defineProperty(window, 'indexedDB', { value: indexedDBMock })
+
+}

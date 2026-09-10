@@ -1,3 +1,4 @@
+import { isVideoUrl, mediaExtension } from '@/lib/media';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import type { RedditPost, SortType, TimeFrame } from '@/services/reddit';
@@ -39,11 +40,11 @@ const extractMediaUrls = (postDetail: any): string[] => {
         }
         const finalUrl = postDetail.url_overridden_by_dest || postDetail.url;
         if (!extracted && finalUrl) {
-             const lowerUrl = finalUrl.toLowerCase();
-             if (lowerUrl.endsWith('.jpg') || lowerUrl.endsWith('.jpeg') || lowerUrl.endsWith('.png') || lowerUrl.endsWith('.webp')) {
+             const extension = mediaExtension(finalUrl);
+             if (['jpg', 'jpeg', 'png', 'webp'].includes(extension)) {
                 urls.push(finalUrl);
                 extracted = true;
-             } else if (lowerUrl.endsWith('.gif')) {
+             } else if (extension === 'gif') {
                 // For GIFs, try to use a preview/thumbnail instead of the full-size GIF
                 if (postDetail.preview?.images?.[0]?.resolutions && postDetail.preview.images[0].resolutions.length > 0) {
                     // Use the smallest thumbnail for fastest loading in grid view
@@ -112,8 +113,8 @@ const extractFullQualityUrls = (postDetail: any): string[] => {
         }
         const finalUrl = postDetail.url_overridden_by_dest || postDetail.url;
         if (!extracted && finalUrl) {
-             const lowerUrl = finalUrl.toLowerCase();
-             if (lowerUrl.endsWith('.jpg') || lowerUrl.endsWith('.jpeg') || lowerUrl.endsWith('.png') || lowerUrl.endsWith('.gif') || lowerUrl.endsWith('.webp')) {
+             const extension = mediaExtension(finalUrl);
+             if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension)) {
                 urls.push(finalUrl);
                 extracted = true;
              }
@@ -205,7 +206,8 @@ export async function GET(request: NextRequest) {
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'User-Agent': userAgent,
-            }
+            },
+            cache: 'no-store'
         });
 
         if (!redditResponse.ok) {
@@ -233,7 +235,7 @@ export async function GET(request: NextRequest) {
                 let isUnplayableVideo = false;
 
                 const isVideoPost = postData.is_video === true;
-                const usedNonVideoUrl = mediaUrls.length > 0 && !mediaUrls[0].endsWith('.mp4');
+                const usedNonVideoUrl = mediaUrls.length > 0 && !isVideoUrl(mediaUrls[0]);
                 const extractionFailedForVideo = isVideoPost && mediaUrls.length === 0;
 
                 if (isVideoPost && (usedNonVideoUrl || extractionFailedForVideo)) {
@@ -253,7 +255,7 @@ export async function GET(request: NextRequest) {
                     mediaUrls = extractMediaUrls(parentData);
                     fullQualityUrls = extractFullQualityUrls(parentData);
                     const isParentVideo = parentData.is_video === true;
-                    const usedParentNonVideoUrl = mediaUrls.length > 0 && !mediaUrls[0].endsWith('.mp4');
+                    const usedParentNonVideoUrl = mediaUrls.length > 0 && !isVideoUrl(mediaUrls[0]);
                     const extractionFailedForParentVideo = isParentVideo && mediaUrls.length === 0;
 
                     if (isParentVideo && (usedParentNonVideoUrl || extractionFailedForParentVideo)) {
@@ -289,7 +291,7 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json(
             { posts, after: data.data.after },
-            { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
+            { headers: { 'Cache-Control': searchParams.get('refresh') === '1' ? 'no-store' : 'public, s-maxage=60, stale-while-revalidate=300' } }
         );
 
     } catch (error: any) {

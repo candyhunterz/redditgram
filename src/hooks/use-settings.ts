@@ -53,6 +53,14 @@ export function useSettings() {
           const validated = validateSettings(parsed)
           setSettings(current => ({ ...current, ...validated }))
         }
+      } else {
+        // Preserve preferences saved before settings became the single source of truth.
+        const theme = localStorage.getItem('theme');
+        const gridDensity = localStorage.getItem('gridDensity');
+        setSettings(current => ({ ...current, ...validateSettings({
+          ...(theme === 'light' || theme === 'dark' ? { theme } : {}),
+          ...(gridDensity === 'compact' || gridDensity === 'comfortable' || gridDensity === 'spacious' ? { gridDensity } : {}),
+        }) }));
       }
     } catch {
       // Invalid JSON, ignore
@@ -86,7 +94,7 @@ export function useSettings() {
   const updateSetting = useCallback(<K extends keyof Settings>(key: K, value: Settings[K]) => {
     setSettings(current => {
       const updated = { ...current, [key]: value }
-      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated))
+      try { localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated)) } catch { /* Storage may be unavailable. */ }
       return updated
     })
   }, [])
@@ -96,7 +104,7 @@ export function useSettings() {
     setSettings(current => {
       const validated = validateSettings(partial)
       const updated = { ...current, ...validated }
-      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated))
+      try { localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated)) } catch { /* Storage may be unavailable. */ }
       return updated
     })
   }, [])
@@ -132,6 +140,11 @@ export function useSettings() {
     }
     return settings.theme
   }, [settings.theme, systemPrefersDark])
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', resolvedTheme === 'dark');
+    document.documentElement.classList.toggle('light', resolvedTheme === 'light');
+  }, [resolvedTheme]);
 
   return {
     settings,

@@ -105,7 +105,7 @@ describe('useRedditPosts', () => {
     expect(mockGetPosts).toHaveBeenCalledWith('pics', 'hot', expect.any(Object))
   })
 
-  it('fetchInitialPosts uses IndexedDB cache on hit — does not call getPosts', async () => {
+  it('explicit fetch bypasses IndexedDB even on a cache hit', async () => {
     mockGetCachedPosts.mockResolvedValue({ posts: [mockPost], after: null })
 
     const { result } = renderHook(() => useRedditPosts(defaultOptions))
@@ -114,7 +114,8 @@ describe('useRedditPosts', () => {
       await result.current.fetchInitialPosts()
     })
 
-    expect(mockGetPosts).not.toHaveBeenCalled()
+    expect(mockGetPosts).toHaveBeenCalledWith('pics', 'hot', expect.objectContaining({ refresh: true }))
+    expect(mockGetCachedPosts).not.toHaveBeenCalled()
     expect(result.current.posts).toHaveLength(1)
     expect(result.current.posts[0].postId).toBe('abc123')
     expect(result.current.fetchInitiated).toBe(true)
@@ -196,3 +197,65 @@ describe('useRedditPosts', () => {
     expect(typeof result.current.lastPostRef).toBe('function')
   })
 })
+
+
+describe('feed consistency regressions', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetCachedPosts.mockResolvedValue(null);
+    mockSetCachedPosts.mockResolvedValue(undefined);
+    mockGetPosts.mockReset();
+  });
+
+  it('uses explicit preset filters for the first page and all pagination', async () => {
+    mockGetPosts.mockResolvedValueOnce({ posts: [mockPost], after: 't3_next' })
+      .mockResolvedValueOnce({ posts: [mockPost2], after: null });
+    const { result, rerender } = renderHook(props => useRedditPosts(props), { initialProps: defaultOptions });
+    await act(async () => { await result.current.fetchInitialPosts('aww', { sortType: 'top', timeFrame: 'year' }); });
+    rerender({ ...defaultOptions, subredditInput: 'cats' });
+    await act(async () => { await result.current.loadMorePosts(); });
+    expect(mockGetPosts).toHaveBeenNthCalledWith(1, 'aww', 'top', expect.objectContaining({ timeFrame: 'year', refresh: true }));
+    expect(mockGetPosts).toHaveBeenNthCalledWith(2, 'aww', 'top', expect.objectContaining({ timeFrame: 'year', after: 't3_next' }));
+  });
+
+  it('does not let a slow old feed overwrite a newer feed or cache it', async () => {
+    let finishOld!: (value: { posts: RedditPost[]; after: null }) => void;
+    mockGetPosts.mockImplementationOnce(() => new Promise(resolve => { finishOld = resolve; }))
+      .mockResolvedValueOnce({ posts: [mockPost2], after: null });
+    const { result } = renderHook(() => useRedditPosts(defaultOptions));
+    let oldRequest!: Promise<void>;
+    await act(async () => { oldRequest = result.current.fetchInitialPosts('pics'); });
+    const oldSignal = mockGetPosts.mock.calls[0][2].signal;
+    await act(async () => { await result.current.fetchInitialPosts('aww'); });
+    expect(oldSignal?.aborted).toBe(true);
+    await act(async () => { finishOld({ posts: [mockPost], after: null }); await oldRequest; });
+    expect(result.current.posts.map(p => p.postId)).toEqual(['def456']);
+    expect(mockSetCachedPosts).toHaveBeenCalledTimes(1);
+    expect(result.current.error).toBeNull();
+    expect(result.current.isLoading).toBe(false);
+  });
+
+  it('ignores stale pagination after switching feeds', async () => {
+    let finishPage!: (value: { posts: RedditPost[]; after: null }) => void;
+    mockGetPosts.mockResolvedValueOnce({ posts: [mockPost], after: 't3_next' })
+      .mockImplementationOnce(() => new Promise(resolve => { finishPage = resolve; }))
+      .mockResolvedValueOnce({ posts: [mockPost2], after: null });
+    const { result } = renderHook(() => useRedditPosts(defaultOptions));
+    await act(async () => { await result.current.fetchInitialPosts(); });
+    let oldPage!: Promise<void>;
+    await act(async () => { oldPage = result.current.loadMorePosts(); });
+    await act(async () => { await result.current.fetchInitialPosts('aww'); });
+    await act(async () => { finishPage({ posts: [mockPost], after: null }); await oldPage; });
+    expect(result.current.posts.map(p => p.postId)).toEqual(['def456']);
+  });
+
+  it('locks pagination synchronously and deduplicates repeated posts', async () => {
+    mockGetPosts.mockResolvedValueOnce({ posts: [mockPost], after: 't3_next' })
+      .mockResolvedValueOnce({ posts: [mockPost, mockPost2], after: null });
+    const { result } = renderHook(() => useRedditPosts(defaultOptions));
+    await act(async () => { await result.current.fetchInitialPosts(); });
+    await act(async () => { await Promise.all([result.current.loadMorePosts(), result.current.loadMorePosts()]); });
+    expect(mockGetPosts).toHaveBeenCalledTimes(2);
+    expect(result.current.posts.map(p => p.postId)).toEqual(['abc123', 'def456']);
+  });
+});

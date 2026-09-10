@@ -4,6 +4,7 @@ import React from 'react';
 import Masonry from 'react-masonry-css';
 import { Loader2 } from 'lucide-react';
 import { PostCard } from '@/components/post-card';
+import { WindowedPost } from '@/components/windowed-post';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import type { RedditPost, FavoritesMap } from '@/types/reddit';
@@ -19,6 +20,7 @@ interface PostGridProps {
   breakpointColumnsObj: Record<string | number, number>;
   gridStyle: React.CSSProperties;
   densityGap: number;
+  showMetadata: boolean;
   lastPostRef: (node: HTMLDivElement | null) => void;
   onToggleFavorite: (post: RedditPost) => void;
   onOpenDialog: (post: RedditPost) => void;
@@ -38,6 +40,7 @@ export function PostGrid({
   breakpointColumnsObj,
   gridStyle,
   densityGap,
+  showMetadata,
   lastPostRef,
   onToggleFavorite,
   onOpenDialog,
@@ -135,20 +138,25 @@ export function PostGrid({
             aria-label="Media posts"
           >
             {posts.map((post, index) => {
-              const isLast = !showFavoritesOnly && index === posts.length - 1;
               return (
+                <WindowedPost key={`${post.subreddit}-${post.postId}`} initialVisible={index < 24} gap={densityGap}>
                 <PostCard
-                  key={`${post.subreddit}-${post.postId}`}
-                  ref={isLast ? lastPostRef : null}
                   post={post}
                   isFavorite={!!favorites[post.postId]}
-                  onToggleFavorite={() => onToggleFavorite(post)}
-                  onClick={() => onOpenDialog(post)}
-                  gap={densityGap}
+                  onToggleFavorite={onToggleFavorite}
+                  onClick={onOpenDialog}
+                  showMetadata={showMetadata}
+                  gap={0}
                 />
+                </WindowedPost>
               );
             })}
           </Masonry>
+        )}
+
+        {/* Independent sentinel also works when a page contains no displayable media. */}
+        {!showFavoritesOnly && hasMore && fetchInitiated && !error && (posts.length > 0 || rawPostCount === 0) && (
+          <div ref={lastPostRef} className="h-1" aria-hidden="true" />
         )}
 
         {/* Loading More Indicator */}

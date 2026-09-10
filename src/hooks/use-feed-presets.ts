@@ -149,6 +149,7 @@ export function useFeedPresets() {
       toast({ variant: 'destructive', description: `A preset named "${trimmed}" already exists.` });
       return;
     }
+    if (trimmed === oldName) return;
     renamePreset(oldName, trimmed);
     setPresets(prev => prev.map(p => p.name === oldName ? { ...p, name: trimmed } : p));
     setActivePresetName(prev => (prev === oldName ? trimmed : prev));

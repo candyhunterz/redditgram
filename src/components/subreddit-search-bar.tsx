@@ -10,6 +10,7 @@ interface SubredditSearchBarProps {
   subredditInput: string;
   setSubredditInput: (value: string) => void;
   isLoading: boolean;
+  keyboardShortcutsEnabled?: boolean;
   postsExist: boolean;
   onFetch: (inputOverride?: string) => void;
   getSuggestions: (query: string) => string[];
@@ -19,6 +20,7 @@ export function SubredditSearchBar({
   subredditInput,
   setSubredditInput,
   isLoading,
+  keyboardShortcutsEnabled = true,
   postsExist,
   onFetch,
   getSuggestions,
@@ -65,7 +67,7 @@ export function SubredditSearchBar({
             }}
             className="flex-grow text-base w-full"
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !isLoading) onFetch();
+              if (e.key === 'Enter' && keyboardShortcutsEnabled && !isLoading) onFetch();
             }}
           />
           {/* Suggestions Dropdown */}
