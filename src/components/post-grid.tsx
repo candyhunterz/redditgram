@@ -23,7 +23,7 @@ interface PostGridProps {
   showMetadata: boolean;
   lastPostRef: (node: HTMLDivElement | null) => void;
   onToggleFavorite: (post: RedditPost) => void;
-  onOpenDialog: (post: RedditPost) => void;
+  onOpenDialog: (post: RedditPost, mediaIndex?: number) => void;
   onRetry: () => void;
   rawPostCount: number;
   onSubredditClick: (sub: string) => void;

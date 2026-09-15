@@ -22,6 +22,7 @@ export interface FavoritePostInfo {
   thumbnailUrl: string | undefined;
   mediaUrls?: string[];
   fullQualityUrls?: string[];
+  videoManifestUrl?: string;
 }
 
 export type FavoritesMap = { [postId: string]: FavoritePostInfo };

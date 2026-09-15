@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { isVideoUrl } from '@/lib/media';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -13,13 +13,15 @@ interface PostCardProps {
   post: RedditPost;
   isFavorite: boolean;
   onToggleFavorite: (post: RedditPost) => void;
-  onClick: (post: RedditPost) => void;
+  onClick: (post: RedditPost, mediaIndex?: number) => void;
   showMetadata: boolean;
   gap: number;
 }
 
 export const PostCard = React.memo(React.forwardRef<HTMLDivElement, PostCardProps>(
   function PostCard({ post, isFavorite, onToggleFavorite, onClick, gap, showMetadata }, ref) {
+    const mediaIndex = useRef(0);
+    const onMediaIndexChange = useCallback((index: number) => { mediaIndex.current = index; }, []);
     const firstUrl = post?.mediaUrls?.[0];
     const isVideoPost = isVideoUrl(firstUrl);
     const isGalleryPost = post?.mediaUrls?.length > 1;
@@ -35,11 +37,11 @@ export const PostCard = React.memo(React.forwardRef<HTMLDivElement, PostCardProp
         role="listitem"
       >
         <Card
-          onClick={() => !isUnplayable && onClick(post)}
+          onClick={() => !isUnplayable && onClick(post, mediaIndex.current)}
           onKeyDown={(e) => {
             if (e.target === e.currentTarget && !isUnplayable && (e.key === 'Enter' || e.key === ' ')) {
               e.preventDefault();
-              onClick(post);
+              onClick(post, mediaIndex.current);
             }
           }}
           tabIndex={isUnplayable ? -1 : 0}
@@ -88,6 +90,7 @@ export const PostCard = React.memo(React.forwardRef<HTMLDivElement, PostCardProp
           </div>}
           {/* Grid Item Media Carousel */}
           <MediaCarousel
+            onMediaIndexChange={onMediaIndexChange}
             mediaUrls={post.mediaUrls}
             fullQualityUrls={post.fullQualityUrls}
             title={post.title}

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { RedditPost } from '@/types/reddit';
 import type { FavoritePostInfo, FavoritesMap } from '@/types/reddit';
 import {
@@ -20,6 +20,8 @@ export function useFavorites() {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [favoritesLoadComplete, setFavoritesLoadComplete] = useState(false);
   const { toast } = useToast();
+  const pending = useRef(new Set<string>());
+  const current = useRef<FavoritesMap>({});
 
   // Load favorites from IndexedDB on mount
   useEffect(() => {
@@ -27,7 +29,8 @@ export function useFavorites() {
       try {
         const favs = await getAllFavorites();
         if (Object.keys(favs).length > 0) {
-          setFavorites(favs as FavoritesMap);
+          current.current = favs as FavoritesMap;
+          setFavorites(current.current);
         }
         setFavoritesLoadComplete(true);
       } catch (err) {
@@ -44,37 +47,30 @@ export function useFavorites() {
    */
   const toggleFavorite = useCallback(async (post: RedditPost) => {
     const postId = post.postId;
-    setFavorites(currentFavorites => {
-      const newFavorites = { ...currentFavorites };
-      if (!currentFavorites[postId]) {
-        // Add to favorites
-        const data: FavoritePostInfo = {
-          postId,
-          title: post.title,
-          subreddit: post.subreddit,
-          thumbnailUrl: post.mediaUrls?.[0],
-          mediaUrls: post.mediaUrls || [],
-          fullQualityUrls: post.fullQualityUrls || post.mediaUrls || [],
-        };
-        newFavorites[postId] = data;
-        // Granular IDB write (fire-and-forget; errors logged inside putFavorite)
-        putFavorite(postId, {
-          title: data.title,
-          subreddit: data.subreddit,
-          thumbnailUrl: data.thumbnailUrl,
-          mediaUrls: data.mediaUrls,
-          fullQualityUrls: data.fullQualityUrls,
-        });
-        toast({ description: 'Added to favorites' });
-      } else {
-        // Remove from favorites
-        delete newFavorites[postId];
-        deleteFavorite(postId);
-        toast({ description: 'Removed from favorites' });
-      }
-      return newFavorites;
-    });
-  }, [toast]);
+    if (!favoritesLoadComplete || pending.current.has(postId)) return;
+    pending.current.add(postId);
+    try {
+      const removing = !!current.current[postId];
+      const data: FavoritePostInfo = {
+        postId, title: post.title, subreddit: post.subreddit,
+        thumbnailUrl: post.mediaUrls?.[0], mediaUrls: post.mediaUrls || [],
+        fullQualityUrls: post.fullQualityUrls || post.mediaUrls || [],
+        videoManifestUrl: post.videoManifestUrl,
+      };
+      if (removing) await deleteFavorite(postId);
+      else await putFavorite(postId, data);
+      const updated = { ...current.current };
+      if (removing) delete updated[postId];
+      else updated[postId] = data;
+      current.current = updated;
+      setFavorites(updated);
+      toast({ description: removing ? 'Removed from favorites' : 'Added to favorites' });
+    } catch {
+      toast({ variant: 'destructive', description: 'Could not save favorites. Please try again.' });
+    } finally {
+      pending.current.delete(postId);
+    }
+  }, [toast, favoritesLoadComplete]);
 
   return {
     favorites,

@@ -32,6 +32,7 @@ export function useRedditPosts({
   addToHistory,
 }: UseRedditPostsOptions) {
   const [posts, setPosts] = useState<RedditPost[]>([]);
+  const [failedPage, setFailedPage] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [afterTokens, setAfterTokens] = useState<{ [subreddit: string]: string | null }>({});
@@ -225,8 +226,9 @@ export function useRedditPosts({
       return;
     }
 
-    // A submitted feed is a refresh. Discard old pagination pages as well.
+    // A submitted feed and its subsequent pages must bypass older cached results.
     apiCache.clear();
+    setFailedPage(false);
 
     setIsLoading(true);
     setError(null);
@@ -270,7 +272,8 @@ export function useRedditPosts({
   // -----------------------------------------------------------------------
   // loadMorePosts — appends the next page to posts
   // -----------------------------------------------------------------------
-  const loadMorePosts = useCallback(async () => {
+  const loadMorePosts = useCallback(async (retry = false) => {
+    if (failedPage && !retry) return;
     if (pending.current || !hasMore || !fetchInitiated || showFavoritesOnly) return;
     const feed = activeFeed.current;
     if (!feed) return;
@@ -300,8 +303,10 @@ export function useRedditPosts({
         feed.timeFrame,
         afterTokens,
         requestController.signal,
+        true,
       );
       if (requestId !== generation.current) return;
+      setFailedPage(false);
       const interleavedNewPosts = interleavePosts(groupedPosts);
       setPosts(prevPosts => {
         const seen = new Set(prevPosts.map(post => post.postId));
@@ -320,14 +325,20 @@ export function useRedditPosts({
       } else {
         setError('An unknown error occurred while loading more posts.');
       }
-      setHasMore(false);
+      setFailedPage(true);
     } finally {
       if (requestId === generation.current) {
         pending.current = false;
         setIsLoading(false);
       }
     }
-  }, [hasMore, fetchInitiated, afterTokens, showFavoritesOnly, performFetch]);
+  }, [hasMore, fetchInitiated, afterTokens, showFavoritesOnly, performFetch, failedPage]);
+
+  const retryFetch = useCallback(() => {
+    if (failedPage) return loadMorePosts(true);
+    const feed = activeFeed.current;
+    return feed ? fetchInitialPosts(feed.subreddits.join(','), feed) : fetchInitialPosts();
+  }, [failedPage, loadMorePosts, fetchInitialPosts]);
 
   // Keep the ref current so IntersectionObserver always calls the latest version.
   useEffect(() => {
@@ -359,7 +370,7 @@ export function useRedditPosts({
   // -----------------------------------------------------------------------
   const { resetPrefetch } = usePrefetch({
     onPrefetch: loadMorePosts,
-    enabled: !isLoading && hasMore && fetchInitiated && !showFavoritesOnly,
+    enabled: !failedPage && !isLoading && hasMore && fetchInitiated && !showFavoritesOnly,
     threshold: 80,
   });
 
@@ -378,6 +389,7 @@ export function useRedditPosts({
     fetchInitiated,
     fetchInitialPosts,
     loadMorePosts,
+    retryFetch,
     lastPostRef,
   };
 }

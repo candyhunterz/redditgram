@@ -1,8 +1,10 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MediaCarousel } from './media-carousel';
 import { PostCard } from './post-card';
 import { Dialog } from './ui/dialog';
+import { FullscreenDialog } from './fullscreen-dialog';
+import { useFullscreenDialog } from '@/hooks/use-fullscreen-dialog';
 
 jest.mock('./progressive-image', () => ({
   ProgressiveImage: ({ src, alt }: { src: string; alt: string }) => <span role="img" aria-label={alt} data-src={src} />,
@@ -49,4 +51,20 @@ it('renders query-string MP4 URLs as video and honors autoplay settings', () => 
   expect(screen.getByTestId('video')).not.toHaveAttribute('autoplay');
   rerender(<Dialog><MediaCarousel {...video} isFullScreen autoplayVideos /></Dialog>);
   expect(screen.getByTestId('video')).toHaveAttribute('autoplay');
+});
+
+
+it('opens the gallery image selected in the feed at full quality', () => {
+  function Gallery() {
+    const { selectedPost, selectedMediaIndex, isDialogOpen, openDialog, closeDialog } = useFullscreenDialog();
+    return <>
+      <PostCard post={post} isFavorite={false} onToggleFavorite={jest.fn()} onClick={openDialog} gap={0} showMetadata={false} />
+      <FullscreenDialog isOpen={isDialogOpen} selectedPost={selectedPost} initialMediaIndex={selectedMediaIndex}
+        onClose={closeDialog} favorites={{}} onToggleFavorite={jest.fn()} onShare={jest.fn()} onDownload={jest.fn()} />
+    </>;
+  }
+  render(<Gallery />);
+  fireEvent.click(screen.getByRole('button', { name: 'Next Media' }));
+  fireEvent.click(screen.getByRole('img'));
+  expect(within(screen.getByRole('dialog')).getByRole('img')).toHaveAttribute('data-src', post.fullQualityUrls[1]);
 });

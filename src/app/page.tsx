@@ -45,13 +45,13 @@ export default function Home() {
   };
 
   const { showScrollTop, scrollToTop } = useScrollToTop();
-  const { selectedPost, isDialogOpen, openDialog, closeDialog } = useFullscreenDialog();
+  const { selectedPost, selectedMediaIndex, isDialogOpen, openDialog, closeDialog } = useFullscreenDialog();
   const { favorites, showFavoritesOnly, setShowFavoritesOnly, toggleFavorite } = useFavorites();
   const {
     presets, activePresetName,
     handleSavePreset, handleLoadPreset, handleUpdatePreset, handleDeletePreset, handleRenamePreset,
   } = useFeedPresets();
-  const { posts, error, isLoading, hasMore, fetchInitiated, fetchInitialPosts, lastPostRef } =
+  const { posts, error, isLoading, hasMore, fetchInitiated, fetchInitialPosts, retryFetch, lastPostRef } =
     useRedditPosts({ subredditInput, sortType, timeFrame, showFavoritesOnly, addToHistory });
 
   // basePosts: merge fetched posts or favorites view
@@ -62,7 +62,7 @@ export default function Home() {
         : (favInfo.thumbnailUrl ? [favInfo.thumbnailUrl] : []);
       const fullQualityUrls = favInfo.fullQualityUrls?.length ? favInfo.fullQualityUrls : mediaUrls;
       return { postId: favInfo.postId, title: favInfo.title, subreddit: favInfo.subreddit,
-        mediaUrls, fullQualityUrls, isUnplayableVideoFormat: false };
+        mediaUrls, fullQualityUrls, videoManifestUrl: favInfo.videoManifestUrl, isUnplayableVideoFormat: false };
     });
   }, [posts, favorites, showFavoritesOnly]);
 
@@ -165,7 +165,7 @@ export default function Home() {
         showMetadata={settings.showMetadata}
         densityGap={densityConfig.gap} lastPostRef={lastPostRef}
         onToggleFavorite={toggleFavorite} onOpenDialog={openDialog}
-        onRetry={() => triggerFetch()} rawPostCount={posts.length}
+        onRetry={retryFetch} rawPostCount={posts.length}
         onSubredditClick={(sub) => { setSubredditInput(sub); setTimeout(() => triggerFetch(sub), 0); }}
       />
 
@@ -176,7 +176,7 @@ export default function Home() {
         </Button>
       )}
 
-      <FullscreenDialog isOpen={isDialogOpen} onClose={closeDialog} selectedPost={selectedPost}
+      <FullscreenDialog initialMediaIndex={selectedMediaIndex} isOpen={isDialogOpen} onClose={closeDialog} selectedPost={selectedPost}
         favorites={favorites} onToggleFavorite={toggleFavorite} onShare={handleShare} onDownload={handleDownload}
         autoplayVideos={settings.autoplayVideos} keyboardShortcutsEnabled={settings.keyboardShortcutsEnabled} />
 

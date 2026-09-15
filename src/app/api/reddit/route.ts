@@ -1,141 +1,8 @@
-import { isVideoUrl, mediaExtension } from '@/lib/media';
+import { isVideoUrl } from '@/lib/media';
+import { extractRedditMedia, fullQualityRedditMedia, redditVideoManifest } from '@/lib/reddit-media';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import type { RedditPost, SortType, TimeFrame } from '@/services/reddit';
-
-// ========================================================================
-// 1. HELPER FUNCTION
-// ========================================================================
-const extractMediaUrls = (postDetail: any): string[] => {
-    if (!postDetail) return [];
-    const urls: string[] = [];
-    let extracted = false;
-    try {
-        if (postDetail.is_gallery && postDetail.gallery_data?.items && postDetail.media_metadata) {
-            for (const item of postDetail.gallery_data.items) {
-                const mediaId = item.media_id;
-                const mediaMeta = postDetail.media_metadata[mediaId];
-                if (!mediaMeta) continue;
-                let bestUrl = '';
-                // Use medium-sized preview (index 2-3) instead of largest for better loading performance
-                if (mediaMeta.p && mediaMeta.p.length > 0) {
-                    const mediumIndex = Math.min(2, mediaMeta.p.length - 1);
-                    bestUrl = mediaMeta.p[mediumIndex]?.u;
-                }
-                if (!bestUrl && mediaMeta.s?.u) bestUrl = mediaMeta.s.u;
-                if (bestUrl) urls.push(bestUrl);
-            }
-            if (urls.length > 0) extracted = true;
-        }
-        const redditVideo = postDetail.media?.reddit_video || postDetail.secure_media?.reddit_video;
-        if (!extracted && redditVideo?.fallback_url) {
-            if (redditVideo.fallback_url.includes('.mp4') && !redditVideo.fallback_url.includes('DASHPlaylist.mpd') && !redditVideo.fallback_url.includes('.m3u8')) {
-                 urls.push(redditVideo.fallback_url);
-                 extracted = true;
-            }
-        }
-        if (!extracted && postDetail.preview?.reddit_video_preview?.fallback_url) {
-            urls.push(postDetail.preview.reddit_video_preview.fallback_url);
-            extracted = true;
-        }
-        const finalUrl = postDetail.url_overridden_by_dest || postDetail.url;
-        if (!extracted && finalUrl) {
-             const extension = mediaExtension(finalUrl);
-             if (['jpg', 'jpeg', 'png', 'webp'].includes(extension)) {
-                urls.push(finalUrl);
-                extracted = true;
-             } else if (extension === 'gif') {
-                // For GIFs, try to use a preview/thumbnail instead of the full-size GIF
-                if (postDetail.preview?.images?.[0]?.resolutions && postDetail.preview.images[0].resolutions.length > 0) {
-                    // Use the smallest thumbnail for fastest loading in grid view
-                    const resolutions = postDetail.preview.images[0].resolutions;
-                    const previewUrl = resolutions[0]?.url;
-                    if (previewUrl) {
-                        urls.push(previewUrl);
-                        extracted = true;
-                    }
-                }
-                // Fallback to full GIF if no preview available
-                if (!extracted) {
-                    urls.push(finalUrl);
-                    extracted = true;
-                }
-             }
-        }
-        const oEmbed = postDetail.media?.oembed || postDetail.secure_media?.oembed;
-        if (!extracted && oEmbed?.thumbnail_url) {
-             const thumbLower = oEmbed.thumbnail_url.toLowerCase();
-             if (thumbLower.includes('.jpg') || thumbLower.includes('.png') || thumbLower.includes('.jpeg')) {
-                 urls.push(oEmbed.thumbnail_url);
-                 extracted = true;
-             }
-        }
-        if (!extracted && postDetail.preview?.images?.[0]?.source?.url) {
-             urls.push(postDetail.preview.images[0].source.url);
-             extracted = true;
-        }
-    } catch (mediaError) {
-        console.error(`Error during media extraction for post ${postDetail?.id}:`, mediaError);
-    }
-    return urls;
-};
-
-const extractFullQualityUrls = (postDetail: any): string[] => {
-    if (!postDetail) return [];
-    const urls: string[] = [];
-    let extracted = false;
-    try {
-        if (postDetail.is_gallery && postDetail.gallery_data?.items && postDetail.media_metadata) {
-            for (const item of postDetail.gallery_data.items) {
-                const mediaId = item.media_id;
-                const mediaMeta = postDetail.media_metadata[mediaId];
-                if (!mediaMeta) continue;
-                let bestUrl = '';
-                // Use the LARGEST/highest quality image for fullscreen
-                if (mediaMeta.p && mediaMeta.p.length > 0) {
-                    bestUrl = mediaMeta.p[mediaMeta.p.length - 1]?.u;
-                }
-                if (!bestUrl && mediaMeta.s?.u) bestUrl = mediaMeta.s.u;
-                if (bestUrl) urls.push(bestUrl);
-            }
-            if (urls.length > 0) extracted = true;
-        }
-        const redditVideo = postDetail.media?.reddit_video || postDetail.secure_media?.reddit_video;
-        if (!extracted && redditVideo?.fallback_url) {
-            if (redditVideo.fallback_url.includes('.mp4') && !redditVideo.fallback_url.includes('DASHPlaylist.mpd') && !redditVideo.fallback_url.includes('.m3u8')) {
-                 urls.push(redditVideo.fallback_url);
-                 extracted = true;
-            }
-        }
-        if (!extracted && postDetail.preview?.reddit_video_preview?.fallback_url) {
-            urls.push(postDetail.preview.reddit_video_preview.fallback_url);
-            extracted = true;
-        }
-        const finalUrl = postDetail.url_overridden_by_dest || postDetail.url;
-        if (!extracted && finalUrl) {
-             const extension = mediaExtension(finalUrl);
-             if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension)) {
-                urls.push(finalUrl);
-                extracted = true;
-             }
-        }
-        const oEmbed = postDetail.media?.oembed || postDetail.secure_media?.oembed;
-        if (!extracted && oEmbed?.thumbnail_url) {
-             const thumbLower = oEmbed.thumbnail_url.toLowerCase();
-             if (thumbLower.includes('.jpg') || thumbLower.includes('.png') || thumbLower.includes('.jpeg')) {
-                 urls.push(oEmbed.thumbnail_url);
-                 extracted = true;
-             }
-        }
-        if (!extracted && postDetail.preview?.images?.[0]?.source?.url) {
-             urls.push(postDetail.preview.images[0].source.url);
-             extracted = true;
-        }
-    } catch (mediaError) {
-        console.error(`Error during full quality media extraction for post ${postDetail?.id}:`, mediaError);
-    }
-    return urls;
-};
 
 // ========================================================================
 // 2. OAUTH TOKEN HANDLER
@@ -225,13 +92,14 @@ export async function GET(request: NextRequest) {
         // ★★★★★★★★★★★★★★★★★★★★ THE FIX ★★★★★★★★★★★★★★★★★★★★
         // The mapping logic is now correctly placed inside the .map() call.
         // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-        const posts: RedditPost[] = data.data.children
-            .map((child: any): RedditPost | null => {
+        const mappedPosts = await Promise.all(data.data.children
+            .map(async (child: any): Promise<RedditPost | null> => {
                 let postData = child?.data;
                 if (!postData) return null;
 
-                let mediaUrls = extractMediaUrls(postData);
-                let fullQualityUrls = extractFullQualityUrls(postData);
+                let mediaUrls = extractRedditMedia(postData);
+                let fullQualityUrls = await fullQualityRedditMedia(postData);
+                let videoManifestUrl = redditVideoManifest(postData);
                 let isUnplayableVideo = false;
 
                 const isVideoPost = postData.is_video === true;
@@ -252,8 +120,9 @@ export async function GET(request: NextRequest) {
 
                 if (mediaUrls.length === 0 && postData.crosspost_parent_list?.[0]) {
                     const parentData = postData.crosspost_parent_list[0];
-                    mediaUrls = extractMediaUrls(parentData);
-                    fullQualityUrls = extractFullQualityUrls(parentData);
+                    mediaUrls = extractRedditMedia(parentData);
+                    fullQualityUrls = await fullQualityRedditMedia(parentData);
+                    videoManifestUrl = redditVideoManifest(parentData);
                     const isParentVideo = parentData.is_video === true;
                     const usedParentNonVideoUrl = mediaUrls.length > 0 && !isVideoUrl(mediaUrls[0]);
                     const extractionFailedForParentVideo = isParentVideo && mediaUrls.length === 0;
@@ -273,6 +142,7 @@ export async function GET(request: NextRequest) {
 
                 if (mediaUrls.length > 0) {
                     return {
+                        videoManifestUrl,
                         title: postData.title || '',
                         mediaUrls: mediaUrls,
                         fullQualityUrls: fullQualityUrls.length > 0 ? fullQualityUrls : mediaUrls,
@@ -286,8 +156,8 @@ export async function GET(request: NextRequest) {
                     };
                 }
                 return null;
-            })
-            .filter((post: RedditPost | null): post is RedditPost => post !== null);
+            }));
+        const posts = mappedPosts.filter((post: RedditPost | null): post is RedditPost => post !== null);
 
         return NextResponse.json(
             { posts, after: data.data.after },

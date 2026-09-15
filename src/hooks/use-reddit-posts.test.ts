@@ -259,3 +259,39 @@ describe('feed consistency regressions', () => {
     expect(result.current.posts.map(p => p.postId)).toEqual(['abc123', 'def456']);
   });
 });
+
+
+it('refreshes pagination instead of reusing a stale persistent page', async () => {
+  jest.clearAllMocks();
+  mockGetPosts.mockReset();
+  mockGetCachedPosts.mockResolvedValue({ posts: [mockPost], after: null });
+  mockGetPosts.mockResolvedValueOnce({ posts: [mockPost], after: 't3_next' })
+    .mockResolvedValueOnce({ posts: [mockPost2], after: null });
+  const { result } = renderHook(() => useRedditPosts(defaultOptions));
+  await act(async () => { await result.current.fetchInitialPosts(); });
+  await act(async () => { await result.current.loadMorePosts(); });
+  expect(mockGetCachedPosts).not.toHaveBeenCalled();
+  expect(mockGetPosts).toHaveBeenLastCalledWith('pics', 'hot', expect.objectContaining({ after: 't3_next', refresh: true }));
+  expect(result.current.posts).toHaveLength(2);
+});
+
+it('retries the failed cursor without dropping posts or using edited feed inputs', async () => {
+  jest.clearAllMocks();
+  mockGetPosts.mockReset();
+  mockGetPosts.mockResolvedValueOnce({ posts: [mockPost], after: 't3_next' })
+    .mockRejectedValueOnce(new Error('offline'))
+    .mockResolvedValueOnce({ posts: [mockPost2], after: null });
+  const { result, rerender } = renderHook(options => useRedditPosts(options), { initialProps: defaultOptions });
+  await act(async () => { await result.current.fetchInitialPosts(); });
+  await act(async () => { await result.current.loadMorePosts(); });
+  expect(result.current.posts).toHaveLength(1);
+  expect(result.current.hasMore).toBe(true);
+  expect(result.current.error).toContain('offline');
+  await act(async () => { await result.current.loadMorePosts(); });
+  expect(mockGetPosts).toHaveBeenCalledTimes(2);
+  rerender({ ...defaultOptions, subredditInput: 'cats' });
+  await act(async () => { await result.current.retryFetch(); });
+  expect(mockGetPosts).toHaveBeenLastCalledWith('pics', 'hot', expect.objectContaining({ after: 't3_next' }));
+  expect(result.current.posts.map(p => p.postId)).toEqual(['abc123', 'def456']);
+  expect(result.current.error).toBeNull();
+});

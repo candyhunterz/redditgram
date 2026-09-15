@@ -6,12 +6,15 @@ import { cn } from '@/lib/utils';
 import { DialogClose } from '@/components/ui/dialog';
 import { ChevronLeft, ChevronRight, X, Video, Heart, Share2, Download } from 'lucide-react';
 import { ProgressiveImage, ProgressiveVideo } from '@/components/progressive-image';
-import { isVideoUrl } from '@/lib/media';
+import { isVideoUrl, redditDashManifest } from '@/lib/media';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 // --- MediaCarousel Component (Updated with Top Control Bar) ---
 export interface MediaCarouselProps {
   mediaUrls: string[];
+  initialMediaIndex?: number;
+  onMediaIndexChange?: (index: number) => void;
+  videoManifestUrl?: string;
   fullQualityUrls?: string[];
   title: string;
   subreddit: string;
@@ -28,11 +31,11 @@ export interface MediaCarouselProps {
 }
 
 export const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
-    mediaUrls, fullQualityUrls, title, subreddit, postId, isFullScreen = false, isUnplayableVideoFormat = false,
+    mediaUrls, fullQualityUrls, initialMediaIndex = 0, onMediaIndexChange, videoManifestUrl, title, subreddit, postId, isFullScreen = false, isUnplayableVideoFormat = false,
     onToggleFavorite, isFavorite = false, onClose, onShare, onDownload, autoplayVideos = true, keyboardShortcutsEnabled = true
 }) => {
     // --- State and Refs ---
-    const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+    const [currentMediaIndex, setCurrentMediaIndex] = useState(initialMediaIndex);
     const isMobile = useIsMobile();
     const containerRef = React.useRef<HTMLDivElement>(null);
     const touchStartX = React.useRef<number | null>(null);
@@ -104,7 +107,8 @@ export const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
 
     // --- Effects ---
     // Reset index when media changes
-    useEffect(() => { setCurrentMediaIndex(0); }, [mediaUrls]);
+    useEffect(() => { setCurrentMediaIndex(initialMediaIndex); }, [mediaUrls, initialMediaIndex]);
+    useEffect(() => { onMediaIndexChange?.(currentMediaIndex); }, [currentMediaIndex, onMediaIndexChange]);
 
     // Keyboard navigation effect
     useEffect(() => {
@@ -222,7 +226,7 @@ export const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
             <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
                  {isUnplayableVideoFormat && isFullScreen ? (
                      <div className="relative w-full h-full flex flex-col items-center justify-center bg-gray-900 text-white p-4 text-center">
-                         {currentMediaUrl && ( <ProgressiveImage src={currentMediaUrl} alt={title + " (Preview)"} className="max-w-full max-h-[70vh] object-contain mb-4"/> )}
+                         {currentMediaUrl && ( <ProgressiveImage src={currentMediaUrl} alt={title + " (Preview)"} unoptimized className="max-w-full max-h-[70vh] object-contain mb-4"/> )}
                          <Video className="w-10 h-10 mb-2 opacity-60" />
                          <p className="text-base font-semibold mb-2">Video format not supported in this app.</p>
                          <a href={`https://www.reddit.com/r/${subreddit}/comments/${postId}`} target="_blank" rel="noopener noreferrer" className="text-base underline text-blue-400 hover:text-blue-300"> View Original Post on Reddit </a>
@@ -231,6 +235,8 @@ export const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
                     <ProgressiveVideo
                       key={`${currentMediaUrl}-${currentMediaIndex}`}
                       src={currentMediaUrl}
+                      manifestUrl={isFullScreen ? videoManifestUrl || redditDashManifest(currentMediaUrl) : undefined}
+                      fallbackSrc={isFullScreen && isVideoUrl(mediaUrls[currentMediaIndex]) ? mediaUrls[currentMediaIndex] : undefined}
                       className={cn("object-contain block", isFullScreen ? 'max-h-[90vh] max-w-[95vw]' : 'h-auto w-full')}
                       controls={isFullScreen}
                       muted={!isFullScreen}
@@ -246,6 +252,7 @@ export const MediaCarousel: React.FC<MediaCarouselProps> = React.memo(({
                       alt={title}
                       className={cn("object-cover block w-full", isFullScreen ? 'max-h-[90vh] max-w-[95vw] object-contain' : 'h-auto')}
                       loading={!isFullScreen ? "lazy" : "eager"}
+                      unoptimized={isFullScreen}
                     />
                  )}
 

@@ -210,3 +210,19 @@ it('preserves a persisted preset when the new name is unchanged', async () => {
   await renamePreset('Same Name', 'Same Name');
   expect(await getAllSavedLists()).toContainEqual(preset);
 });
+
+
+it('propagates database write failures so the UI cannot claim a successful save', async () => {
+  const { openDB } = await import('idb');
+  await getAllSavedLists();
+  const db = await (openDB as jest.Mock).mock.results[0].value;
+  const error = new Error('Quota exceeded');
+  db.put.mockRejectedValueOnce(error);
+  await expect(putFavorite('failed', makeFavoriteData())).rejects.toThrow('Quota exceeded');
+  db.put.mockRejectedValueOnce(error);
+  await expect(putPreset(makePreset())).rejects.toThrow('Quota exceeded');
+  db.delete.mockRejectedValueOnce(error);
+  await expect(deleteFavorite('failed')).rejects.toThrow('Quota exceeded');
+  db.delete.mockRejectedValueOnce(error);
+  await expect(deletePreset('failed')).rejects.toThrow('Quota exceeded');
+});

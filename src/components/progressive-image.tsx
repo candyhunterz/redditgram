@@ -4,7 +4,7 @@
  * Shows a blur placeholder while the full image loads.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
@@ -13,6 +13,7 @@ interface ProgressiveImageProps {
   alt: string;
   className?: string;
   loading?: 'lazy' | 'eager';
+  unoptimized?: boolean;
   onLoad?: () => void;
   onError?: () => void;
 }
@@ -38,6 +39,7 @@ export const ProgressiveImage: React.FC<ProgressiveImageProps> = ({
   alt,
   className,
   loading = 'lazy',
+  unoptimized = false,
   onLoad,
   onError,
 }) => {
@@ -63,7 +65,7 @@ export const ProgressiveImage: React.FC<ProgressiveImageProps> = ({
   return (
     <Image
       src={src}
-      unoptimized={!canOptimize(src)}
+      unoptimized={unoptimized || !canOptimize(src)}
       alt={alt}
       width={0}
       height={0}
@@ -82,6 +84,8 @@ export const ProgressiveImage: React.FC<ProgressiveImageProps> = ({
 // Video component with loading state
 interface ProgressiveVideoProps {
   src: string;
+  manifestUrl?: string;
+  fallbackSrc?: string;
   className?: string;
   controls?: boolean;
   muted?: boolean;
@@ -94,6 +98,8 @@ interface ProgressiveVideoProps {
 
 export const ProgressiveVideo: React.FC<ProgressiveVideoProps> = ({
   src,
+  manifestUrl,
+  fallbackSrc,
   className,
   controls = false,
   muted = true,
@@ -105,12 +111,54 @@ export const ProgressiveVideo: React.FC<ProgressiveVideoProps> = ({
 }) => {
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [videoError, setVideoError] = useState(false);
+  const [useFallback, setUseFallback] = useState(false);
+  const [streamFailed, setStreamFailed] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (!manifestUrl || streamFailed) return;
+    let disposed = false;
+    let player: import('dashjs').MediaPlayerClass | undefined;
+    const fail = () => {
+      if (!disposed) setStreamFailed(true);
+    };
+    // Load streaming code only when opening a Reddit video in the detailed view.
+    void import('dashjs').then(dash => {
+      if (disposed || !videoRef.current) return;
+      player = dash.MediaPlayer().create();
+      player.updateSettings({ streaming: { abr: { autoSwitchBitrate: { video: false } } } });
+      player.on(dash.MediaPlayer.events.STREAM_INITIALIZED, () => {
+        if (!player || disposed) return;
+        const representations = player.getRepresentationsByType('video');
+        const best = [...representations].sort((a, b) =>
+          (b.height - a.height) || (b.bitrateInKbit - a.bitrateInKbit))[0];
+        if (best) player.setRepresentationForTypeById('video', best.id, true);
+      });
+      player.on(dash.MediaPlayer.events.ERROR, (event: { error?: { code?: number } }) => {
+        if (event.error?.code !== dash.MediaPlayer.errors.TIME_SYNC_FAILED_ERROR_CODE) fail();
+      });
+      player.initialize(videoRef.current, manifestUrl, autoPlay);
+    }).catch(fail);
+    return () => {
+      disposed = true;
+      player?.reset();
+    };
+  }, [manifestUrl, autoPlay, streamFailed]);
 
   const handleLoadedData = () => {
     setVideoLoaded(true);
   };
 
   const handleError = () => {
+    if (manifestUrl && !streamFailed) {
+      setStreamFailed(true);
+      return;
+    }
+    if (!useFallback && fallbackSrc && fallbackSrc !== src) {
+      setUseFallback(true);
+      setVideoLoaded(false);
+      return;
+    }
     setVideoError(true);
   };
 
@@ -132,7 +180,9 @@ export const ProgressiveVideo: React.FC<ProgressiveVideoProps> = ({
       )}
 
       <video
-        src={src}
+        key={manifestUrl && !streamFailed ? 'stream' : 'mp4'}
+        ref={videoRef}
+        src={manifestUrl && !streamFailed ? undefined : useFallback ? fallbackSrc : src}
         className={cn('w-full h-full object-contain transition-opacity duration-300', className)}
         controls={controls}
         muted={muted}
@@ -145,6 +195,11 @@ export const ProgressiveVideo: React.FC<ProgressiveVideoProps> = ({
         onLoadedData={handleLoadedData}
         onError={handleError}
       />
+      {streamFailed && !videoError && (
+        <p className="absolute bottom-16 left-2 right-2 text-center text-xs text-white bg-black/70 p-2">
+          Streaming unavailable. Playing the MP4 fallback, which may have no audio.
+        </p>
+      )}
     </div>
   );
 };

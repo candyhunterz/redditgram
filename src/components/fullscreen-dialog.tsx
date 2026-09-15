@@ -9,6 +9,7 @@ import type { RedditPost } from '@/types/reddit';
 
 // --- FullscreenDialog Component ---
 interface FullscreenDialogProps {
+  initialMediaIndex?: number;
   isOpen: boolean;
   onClose: () => void;
   selectedPost: RedditPost | null;
@@ -21,6 +22,7 @@ interface FullscreenDialogProps {
 }
 
 export function FullscreenDialog({
+  initialMediaIndex = 0,
   isOpen,
   onClose,
   selectedPost,
@@ -45,6 +47,8 @@ export function FullscreenDialog({
 
             {selectedPost ? (
                <MediaCarousel
+                  initialMediaIndex={initialMediaIndex}
+                  videoManifestUrl={selectedPost.videoManifestUrl}
                   mediaUrls={selectedPost.mediaUrls}
                   fullQualityUrls={selectedPost.fullQualityUrls}
                   title={selectedPost.title}

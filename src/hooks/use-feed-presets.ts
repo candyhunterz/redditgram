@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { SortType, TimeFrame } from '@/types/reddit';
 import {
   FeedPreset,
@@ -24,6 +24,17 @@ export function useFeedPresets() {
   const [activePresetName, setActivePresetName] = useState<string | null>(null);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const { toast } = useToast();
+  const pending = useRef(false);
+  const persist = useCallback(async (write: () => Promise<void>, committed: () => void) => {
+    if (pending.current || !initialLoadComplete) return;
+    pending.current = true;
+    try {
+      await write();
+      committed();
+    } catch {
+      toast({ variant: 'destructive', description: 'Could not save preset changes. Please try again.' });
+    } finally { pending.current = false; }
+  }, [initialLoadComplete, toast]);
 
   // Load presets from IndexedDB on mount (also clears old post cache)
   useEffect(() => {
@@ -77,11 +88,12 @@ export function useFeedPresets() {
       order: Date.now(),
       timestamp: Date.now(),
     };
-    putPreset(newPreset);
-    setPresets(prev => [...prev, newPreset]);
-    setActivePresetName(trimmedName);
-    toast({ description: `Preset "${trimmedName}" saved.` });
-  }, [presets, toast]);
+    return persist(() => putPreset(newPreset), () => {
+      setPresets(prev => [...prev, newPreset]);
+      setActivePresetName(trimmedName);
+      toast({ description: `Preset "${trimmedName}" saved.` });
+    });
+  }, [presets, toast, persist]);
 
   /**
    * Load a preset: updates activePresetName and returns the preset so the
@@ -107,32 +119,27 @@ export function useFeedPresets() {
       toast({ variant: 'destructive', description: 'Input field is empty.' });
       return;
     }
-    setPresets(prev => {
-      const updated = prev.map(p =>
-        p.name === presetName
-          ? { ...p, subreddits: currentInput, sortType, timeFrame, timestamp: Date.now() }
-          : p
-      );
-      const updatedPreset = updated.find(p => p.name === presetName);
-      if (updatedPreset) {
-        putPreset(updatedPreset);
-      }
-      return updated;
+    const existing = presets.find(p => p.name === presetName);
+    if (!existing) return;
+    const updated = { ...existing, subreddits: currentInput, sortType, timeFrame, timestamp: Date.now() };
+    return persist(() => putPreset(updated), () => {
+      setPresets(prev => prev.map(p => p.name === presetName ? updated : p));
+      toast({ description: `Preset "${presetName}" updated.` });
     });
-    toast({ description: `Preset "${presetName}" updated.` });
-  }, [toast]);
+  }, [presets, toast, persist]);
 
   /**
    * Delete a preset by name.
    */
   const handleDeletePreset = useCallback((presetName: string) => {
     if (window.confirm(`Delete preset "${presetName}"?`)) {
-      deletePreset(presetName);
-      setPresets(prev => prev.filter(p => p.name !== presetName));
-      setActivePresetName(prev => (prev === presetName ? null : prev));
-      toast({ description: `Preset "${presetName}" deleted.` });
+      return persist(() => deletePreset(presetName), () => {
+        setPresets(prev => prev.filter(p => p.name !== presetName));
+        setActivePresetName(prev => (prev === presetName ? null : prev));
+        toast({ description: `Preset "${presetName}" deleted.` });
+      });
     }
-  }, [toast]);
+  }, [toast, persist]);
 
   /**
    * Rename a preset. Uses the atomic renamePreset IDB transaction.
@@ -150,11 +157,12 @@ export function useFeedPresets() {
       return;
     }
     if (trimmed === oldName) return;
-    renamePreset(oldName, trimmed);
-    setPresets(prev => prev.map(p => p.name === oldName ? { ...p, name: trimmed } : p));
-    setActivePresetName(prev => (prev === oldName ? trimmed : prev));
-    toast({ description: `Preset renamed to "${trimmed}".` });
-  }, [presets, toast]);
+    return persist(() => renamePreset(oldName, trimmed), () => {
+      setPresets(prev => prev.map(p => p.name === oldName ? { ...p, name: trimmed } : p));
+      setActivePresetName(prev => (prev === oldName ? trimmed : prev));
+      toast({ description: `Preset renamed to "${trimmed}".` });
+    });
+  }, [presets, toast, persist]);
 
   return {
     presets,

@@ -12,8 +12,9 @@ jest.mock('@/lib/indexed-db', () => ({
 }))
 
 // Mock use-toast
+const mockToast = jest.fn();
 jest.mock('@/hooks/use-toast', () => ({
-  useToast: () => ({ toast: jest.fn() }),
+  useToast: () => ({ toast: mockToast }),
 }))
 
 import { useFavorites } from './use-favorites'
@@ -170,3 +171,40 @@ describe('useFavorites', () => {
     expect(result.current.favorites).toEqual({})
   })
 })
+
+
+it('keeps favorite state unchanged and reports a failed save or removal', async () => {
+  jest.clearAllMocks();
+  mockGetAllFavorites.mockResolvedValue({});
+  mockPutFavorite.mockRejectedValueOnce(new Error('Quota exceeded'));
+  const { result } = renderHook(() => useFavorites());
+  await waitFor(() => expect(result.current.favoritesLoadComplete).toBe(true));
+  await act(async () => { await result.current.toggleFavorite(makePost()); });
+  expect(result.current.favorites).toEqual({});
+  expect(mockToast).toHaveBeenLastCalledWith(expect.objectContaining({ variant: 'destructive' }));
+  mockPutFavorite.mockResolvedValueOnce(undefined);
+  await act(async () => { await result.current.toggleFavorite(makePost()); });
+  expect(result.current.favorites.abc123).toBeDefined();
+  mockDeleteFavorite.mockRejectedValueOnce(new Error('Database closed'));
+  await act(async () => { await result.current.toggleFavorite(makePost()); });
+  expect(result.current.favorites.abc123).toBeDefined();
+  expect(mockToast).toHaveBeenLastCalledWith(expect.objectContaining({ variant: 'destructive' }));
+});
+
+it('waits for commit and prevents duplicate favorite writes while saving', async () => {
+  jest.clearAllMocks();
+  mockGetAllFavorites.mockResolvedValue({});
+  let finish!: () => void;
+  mockPutFavorite.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const { result } = renderHook(() => useFavorites());
+  await waitFor(() => expect(result.current.favoritesLoadComplete).toBe(true));
+  let pending!: Promise<void>;
+  act(() => { pending = result.current.toggleFavorite(makePost()); });
+  await act(async () => { await result.current.toggleFavorite(makePost()); });
+  expect(mockPutFavorite).toHaveBeenCalledTimes(1);
+  expect(result.current.favorites).toEqual({});
+  expect(mockToast).not.toHaveBeenCalled();
+  await act(async () => { finish(); await pending; });
+  expect(result.current.favorites.abc123).toBeDefined();
+  expect(mockToast).toHaveBeenCalledWith({ description: 'Added to favorites' });
+});

@@ -9,14 +9,16 @@ import type { RedditPost } from '@/types/reddit';
  */
 export function useFullscreenDialog() {
   const [selectedPost, setSelectedPost] = useState<RedditPost | null>(null);
+  const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const closeTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => clearTimeout(closeTimer.current), []);
 
-  const openDialog = useCallback((post: RedditPost) => {
+  const openDialog = useCallback((post: RedditPost, mediaIndex = 0) => {
     clearTimeout(closeTimer.current);
     setSelectedPost(post);
+    setSelectedMediaIndex(mediaIndex);
     setIsDialogOpen(true);
   }, []);
 
@@ -26,5 +28,5 @@ export function useFullscreenDialog() {
     closeTimer.current = setTimeout(() => { setSelectedPost(null); }, 300);
   }, []);
 
-  return { selectedPost, isDialogOpen, openDialog, closeDialog };
+  return { selectedPost, selectedMediaIndex, isDialogOpen, openDialog, closeDialog };
 }

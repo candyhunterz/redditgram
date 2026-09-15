@@ -43,6 +43,7 @@ interface RedditCacheDB extends DBSchema {
       thumbnailUrl?: string;
       mediaUrls?: string[];
       fullQualityUrls?: string[];
+      videoManifestUrl?: string;
       timestamp: number;
     };
     indexes: { 'by-timestamp': number };
@@ -116,7 +117,12 @@ async function getDB(): Promise<IDBPDatabase<RedditCacheDB>> {
       },
     });
   }
-  return dbPromise;
+  try {
+    return await dbPromise;
+  } catch (error) {
+    dbPromise = null;
+    throw error;
+  }
 }
 
 // ========================================================================
@@ -223,6 +229,7 @@ export async function getAllFavorites(): Promise<Record<string, any>> {
         thumbnailUrl: fav.thumbnailUrl,
         mediaUrls: fav.mediaUrls,
         fullQualityUrls: fav.fullQualityUrls,
+        videoManifestUrl: fav.videoManifestUrl,
       };
       return acc;
     }, {} as Record<string, any>);
@@ -277,6 +284,7 @@ export async function putFavorite(
     thumbnailUrl?: string;
     mediaUrls?: string[];
     fullQualityUrls?: string[];
+    videoManifestUrl?: string;
   }
 ): Promise<void> {
   try {
@@ -284,6 +292,7 @@ export async function putFavorite(
     await db.put('favorites', { postId, ...data, timestamp: Date.now() });
   } catch (error) {
     console.error('Error putting favorite:', error);
+    throw error;
   }
 }
 
@@ -297,6 +306,7 @@ export async function deleteFavorite(postId: string): Promise<void> {
     await db.delete('favorites', postId);
   } catch (error) {
     console.error('Error deleting favorite:', error);
+    throw error;
   }
 }
 
@@ -314,6 +324,7 @@ export async function putPreset(preset: FeedPreset): Promise<void> {
     await db.put('savedLists', preset);
   } catch (error) {
     console.error('Error putting preset:', error);
+    throw error;
   }
 }
 
@@ -327,6 +338,7 @@ export async function deletePreset(name: string): Promise<void> {
     await db.delete('savedLists', name);
   } catch (error) {
     console.error('Error deleting preset:', error);
+    throw error;
   }
 }
 
@@ -348,6 +360,7 @@ export async function renamePreset(oldName: string, newName: string): Promise<vo
     await tx.done;
   } catch (error) {
     console.error('Error renaming preset:', error);
+    throw error;
   }
 }
 

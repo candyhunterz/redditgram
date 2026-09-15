@@ -2,6 +2,7 @@
 
 // The types remain the same as they are used by your component.
 export interface RedditPost {
+    videoManifestUrl?: string;
     title: string;
     mediaUrls: string[]; // Thumbnail/preview URLs for grid view
     fullQualityUrls: string[]; // Full quality URLs for fullscreen view

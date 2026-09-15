@@ -13,8 +13,9 @@ jest.mock('@/lib/indexed-db', () => ({
 }))
 
 // Mock use-toast
+const mockToast = jest.fn();
 jest.mock('@/hooks/use-toast', () => ({
-  useToast: () => ({ toast: jest.fn() }),
+  useToast: () => ({ toast: mockToast }),
 }))
 
 import { useFeedPresets } from './use-feed-presets'
@@ -98,8 +99,8 @@ describe('useFeedPresets', () => {
 
     await waitFor(() => expect(result.current.initialLoadComplete).toBe(true))
 
-    act(() => {
-      result.current.handleSavePreset('pics,aww', 'hot', 'day')
+    await act(async () => {
+      await result.current.handleSavePreset('pics,aww', 'hot', 'day')
     })
 
     expect(mockPutPreset).toHaveBeenCalledWith(expect.objectContaining({
@@ -128,8 +129,8 @@ describe('useFeedPresets', () => {
     await waitFor(() => expect(result.current.initialLoadComplete).toBe(true))
     expect(result.current.presets).toHaveLength(1)
 
-    act(() => {
-      result.current.handleDeletePreset('My Feed')
+    await act(async () => {
+      await result.current.handleDeletePreset('My Feed')
     })
 
     expect(mockDeletePreset).toHaveBeenCalledWith('My Feed')
@@ -149,8 +150,8 @@ describe('useFeedPresets', () => {
 
     await waitFor(() => expect(result.current.initialLoadComplete).toBe(true))
 
-    act(() => {
-      result.current.handleRenamePreset('Old Name')
+    await act(async () => {
+      await result.current.handleRenamePreset('Old Name')
     })
 
     expect(mockRenamePreset).toHaveBeenCalledWith('Old Name', 'New Name')
@@ -166,8 +167,8 @@ describe('useFeedPresets', () => {
 
     await waitFor(() => expect(result.current.initialLoadComplete).toBe(true))
 
-    act(() => {
-      result.current.handleSavePreset('pics', 'hot', 'day')
+    await act(async () => {
+      await result.current.handleSavePreset('pics', 'hot', 'day')
     })
 
     expect(mockPutPreset).not.toHaveBeenCalled()
@@ -189,3 +190,50 @@ describe('useFeedPresets', () => {
     expect(result.current.presets).toEqual([])
   })
 })
+
+
+it('does not report a preset as saved until the write commits, and reports rejection', async () => {
+  jest.clearAllMocks();
+  mockGetAllSavedLists.mockResolvedValue([]);
+  mockClearOldCache.mockResolvedValue(undefined);
+  const prompt = jest.spyOn(window, 'prompt').mockReturnValue('New');
+  let reject!: (error: Error) => void;
+  mockPutPreset.mockImplementationOnce(() => new Promise((_, fail) => { reject = fail; }));
+  const { result } = renderHook(() => useFeedPresets());
+  await waitFor(() => expect(result.current.initialLoadComplete).toBe(true));
+  let pending: Promise<void> | undefined;
+  act(() => { pending = result.current.handleSavePreset('pics', 'hot', 'day'); });
+  expect(result.current.presets).toEqual([]);
+  expect(mockToast).not.toHaveBeenCalled();
+  await act(async () => { reject(new Error('Quota exceeded')); await pending; });
+  expect(result.current.presets).toEqual([]);
+  expect(result.current.activePresetName).toBeNull();
+  expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: 'destructive' }));
+  prompt.mockRestore();
+});
+
+it.each(['delete', 'rename', 'update'])('retains saved presets when %s fails', async operation => {
+  jest.clearAllMocks();
+  mockGetAllSavedLists.mockResolvedValue([makePreset()]);
+  mockClearOldCache.mockResolvedValue(undefined);
+  const prompt = jest.spyOn(window, 'prompt').mockReturnValue('Renamed');
+  const confirm = jest.spyOn(window, 'confirm').mockReturnValue(true);
+  const { result } = renderHook(() => useFeedPresets());
+  await waitFor(() => expect(result.current.initialLoadComplete).toBe(true));
+  const failure = new Error('Storage unavailable');
+  await act(async () => {
+    if (operation === 'delete') {
+      mockDeletePreset.mockRejectedValueOnce(failure);
+      await result.current.handleDeletePreset('My Feed');
+    } else if (operation === 'rename') {
+      mockRenamePreset.mockRejectedValueOnce(failure);
+      await result.current.handleRenamePreset('My Feed');
+    } else {
+      mockPutPreset.mockRejectedValueOnce(failure);
+      await result.current.handleUpdatePreset('My Feed', 'cats', 'top', 'year');
+    }
+  });
+  expect(result.current.presets).toEqual([makePreset()]);
+  expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: 'destructive' }));
+  prompt.mockRestore(); confirm.mockRestore();
+});
